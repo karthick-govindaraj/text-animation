@@ -1076,15 +1076,3 @@ export function renderFrame(
     drawGuides(ctx, settings);
   }
 }
-
-export function canvasToPng(canvas: HTMLCanvasElement) {
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error('Unable to create PNG frame.'));
-      }
-    }, 'image/png');
-  });
-}

@@ -197,6 +197,10 @@ select:focus {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.segmented-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .segmented button,
 .ghost-button,
 .primary-button,
@@ -305,7 +309,8 @@ select:focus {
 
 .template-row,
 .compact-actions,
-.field-grid {
+.field-grid,
+.project-actions {
   display: grid;
   gap: 8px;
 }
@@ -385,6 +390,10 @@ select:focus {
 .compact-actions {
   grid-template-columns: 1fr 1fr auto;
   margin-top: 10px;
+}
+
+.project-actions {
+  grid-template-columns: 1fr 1fr;
 }
 
 .danger {

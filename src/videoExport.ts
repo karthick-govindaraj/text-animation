@@ -1,8 +1,13 @@
 import { ArrayBufferTarget as Mp4ArrayBufferTarget, Muxer as Mp4Muxer } from 'mp4-muxer';
 import { ArrayBufferTarget as WebmArrayBufferTarget, Muxer as WebmMuxer } from 'webm-muxer';
-import { RenderSettings, getFrameCount, renderFrame } from './renderer';
+import { encodeAudioBuffer, renderProjectAudio } from './audio';
+import { RenderSettings, getFrameCount, renderFrameAsync } from './renderer';
 
 type ProgressCallback = (progress: number, label: string) => void;
+type EncodedAudio = {
+  buffer: AudioBuffer;
+  chunks: { chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[];
+};
 
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
@@ -133,7 +138,7 @@ async function encodeFrames(
       throw encoderError;
     }
 
-    renderFrame(canvas, settings, frameIndex / settings.fps, { preview: false });
+    await renderFrameAsync(canvas, settings, frameIndex / settings.fps, { preview: false });
     const frame = new VideoFrame(canvas, {
       timestamp: frameIndex * frameDuration,
       duration: frameDuration
@@ -157,9 +162,38 @@ async function encodeFrames(
   encoder.close();
 }
 
+async function encodeOptionalAudio(
+  settings: RenderSettings,
+  codec: 'aac' | 'opus',
+  onProgress: ProgressCallback,
+  label: string
+): Promise<EncodedAudio | null> {
+  if (!settings.audio.enabled) {
+    return null;
+  }
+
+  const buffer = await renderProjectAudio(settings).catch(() => null);
+  if (!buffer) {
+    return null;
+  }
+
+  onProgress(1, label);
+  const chunks: EncodedAudio['chunks'] = [];
+  try {
+    await encodeAudioBuffer(buffer, codec, (chunk, meta) => chunks.push({ chunk, meta }));
+  } catch (cause) {
+    console.warn('Audio export skipped:', cause);
+    return null;
+  }
+
+  return chunks.length > 0 ? { buffer, chunks } : null;
+}
+
 export async function exportMp4(settings: RenderSettings, onProgress: ProgressCallback) {
   assertWebCodecs();
   await waitForFonts();
+
+  const encodedAudio = await encodeOptionalAudio(settings, 'aac', onProgress, 'Preparing AAC audio');
 
   const target = new Mp4ArrayBufferTarget();
   const muxer = new Mp4Muxer({
@@ -170,11 +204,22 @@ export async function exportMp4(settings: RenderSettings, onProgress: ProgressCa
       height: settings.height,
       frameRate: settings.fps
     },
+    audio: encodedAudio
+      ? {
+          codec: 'aac',
+          numberOfChannels: encodedAudio.buffer.numberOfChannels,
+          sampleRate: encodedAudio.buffer.sampleRate
+        }
+      : undefined,
     fastStart: 'fragmented'
   });
 
   const config = await getSupportedAvcConfig(settings);
   await encodeFrames(settings, config, onProgress, (chunk, meta) => muxer.addVideoChunk(chunk, meta), 'Encoding MP4');
+  if (encodedAudio) {
+    onProgress(94, 'Muxing AAC audio');
+    encodedAudio.chunks.forEach(({ chunk, meta }) => muxer.addAudioChunk(chunk, meta));
+  }
   muxer.finalize();
 
   onProgress(98, 'Preparing MP4');
@@ -185,6 +230,8 @@ export async function exportAlphaWebm(settings: RenderSettings, onProgress: Prog
   assertWebCodecs();
   await waitForFonts();
 
+  const encodedAudio = await encodeOptionalAudio(settings, 'opus', onProgress, 'Preparing Opus audio');
+
   const target = new WebmArrayBufferTarget();
   const muxer = new WebmMuxer({
     target,
@@ -194,7 +241,14 @@ export async function exportAlphaWebm(settings: RenderSettings, onProgress: Prog
       height: settings.height,
       frameRate: settings.fps,
       alpha: true
-    }
+    },
+    audio: encodedAudio
+      ? {
+          codec: 'A_OPUS',
+          numberOfChannels: encodedAudio.buffer.numberOfChannels,
+          sampleRate: encodedAudio.buffer.sampleRate
+        }
+      : undefined
   });
 
   const config = await getSupportedVp9AlphaConfig(settings);
@@ -205,6 +259,10 @@ export async function exportAlphaWebm(settings: RenderSettings, onProgress: Prog
     (chunk, meta) => muxer.addVideoChunk(chunk, meta),
     'Encoding alpha WebM'
   );
+  if (encodedAudio) {
+    onProgress(94, 'Muxing Opus audio');
+    encodedAudio.chunks.forEach(({ chunk, meta }) => muxer.addAudioChunk(chunk, meta));
+  }
   muxer.finalize();
 
   onProgress(98, 'Preparing alpha WebM');
