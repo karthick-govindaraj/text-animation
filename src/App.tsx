@@ -25,11 +25,14 @@ import {
   CaptionScene,
   DEFAULT_BRAND,
   DEFAULT_FONT,
+  FONT_FAMILIES,
   FontControls,
   HighlightShape,
   SCENE_TEMPLATES,
   STYLE_PRESETS,
   SafeAreaPreset,
+  TYPOGRAPHY_PRESETS,
+  TextAlign,
   canvasToPng,
   createScene,
   estimateDuration,
@@ -47,14 +50,6 @@ const FF_VERSION = '0.12.10';
 const BRAND_STORAGE_KEY = 'kinetic-text-brand-kit';
 const FONT_STORAGE_KEY = 'kinetic-text-font-controls';
 
-const fontFamilies = [
-  'Inter, Arial, sans-serif',
-  'Arial Black, Arial, sans-serif',
-  'Georgia, serif',
-  'Impact, Haettenschweiler, sans-serif',
-  'ui-monospace, SFMono-Regular, Menlo, monospace'
-];
-
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -66,6 +61,12 @@ function downloadBlob(blob: Blob, filename: string) {
 
 function filePrefix() {
   return `kinetic-text-${Date.now()}`;
+}
+
+async function waitForFonts() {
+  if ('fonts' in document) {
+    await document.fonts.ready;
+  }
 }
 
 function loadStoredValue<T>(key: string, fallback: T): T {
@@ -198,7 +199,8 @@ export default function App() {
     const scene = createScene({
       title: `Scene ${scenes.length + 1}`,
       text: 'Add your next caption beat.',
-      style: activeScene?.style ?? 'shorts-pop',
+      animationStyle: activeScene?.animationStyle ?? 'shorts-pop',
+      typographyStyle: activeScene?.typographyStyle ?? 'cinematic',
       accent: activeScene?.accent ?? brand.colors[0],
       duration: 3.5
     });
@@ -348,6 +350,7 @@ export default function App() {
       }
 
       ffmpeg = await loadFFmpeg();
+      await waitForFonts();
       names = await writeFrames(ffmpeg, exportCanvas);
       setExportLabel('Encoding alpha MOV');
       setProgress(48);
@@ -452,7 +455,8 @@ export default function App() {
                   <span>
                     <strong>{scene.title}</strong>
                     <small>
-                      {scene.duration.toFixed(1)}s · {STYLE_PRESETS.find((item) => item.id === scene.style)?.label}
+                      {scene.duration.toFixed(1)}s · {STYLE_PRESETS.find((item) => item.id === scene.animationStyle)?.label} ·{' '}
+                      {TYPOGRAPHY_PRESETS.find((item) => item.id === scene.typographyStyle)?.label}
                     </small>
                   </span>
                 </button>
@@ -553,8 +557,32 @@ export default function App() {
               {STYLE_PRESETS.map((item) => (
                 <button
                   key={item.id}
-                  className={activeScene?.style === item.id ? 'style-card active' : 'style-card'}
-                  onClick={() => activeScene && updateScene(activeScene.id, { style: item.id })}
+                  className={activeScene?.animationStyle === item.id ? 'style-card active' : 'style-card'}
+                  onClick={() => activeScene && updateScene(activeScene.id, { animationStyle: item.id })}
+                >
+                  <strong>{item.label}</strong>
+                  <span>{item.description}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="panel-divider" />
+            <div className="panel-heading">
+              <Sparkles size={18} />
+              <span>Typography Styles</span>
+            </div>
+            {activeScene && (
+              <div className="current-pair">
+                <span>Animation: {STYLE_PRESETS.find((item) => item.id === activeScene.animationStyle)?.label}</span>
+                <span>Typography: {TYPOGRAPHY_PRESETS.find((item) => item.id === activeScene.typographyStyle)?.label}</span>
+              </div>
+            )}
+            <div className="style-list preset-list typography-list">
+              {TYPOGRAPHY_PRESETS.map((item) => (
+                <button
+                  key={item.id}
+                  className={activeScene?.typographyStyle === item.id ? 'style-card active' : 'style-card'}
+                  onClick={() => activeScene && updateScene(activeScene.id, { typographyStyle: item.id })}
                 >
                   <strong>{item.label}</strong>
                   <span>{item.description}</span>
@@ -570,10 +598,16 @@ export default function App() {
 
             <div className="field-row">
               <label>Font Family</label>
-              <select value={font.family} onChange={(event) => setFont((current) => ({ ...current, family: event.target.value }))}>
-                {fontFamilies.map((family) => (
-                  <option key={family} value={family}>
-                    {family.split(',')[0]}
+              <select
+                value={font.family}
+                onChange={(event) => {
+                  const selected = FONT_FAMILIES.find((item) => item.family === event.target.value);
+                  setFont((current) => ({ ...current, family: event.target.value, weight: selected?.weight ?? current.weight }));
+                }}
+              >
+                {FONT_FAMILIES.map((fontOption) => (
+                  <option key={fontOption.family} value={fontOption.family}>
+                    {fontOption.label}
                   </option>
                 ))}
               </select>
@@ -684,6 +718,21 @@ export default function App() {
                   <option value="safe-lower">Safe Lower</option>
                 </select>
               </label>
+            </div>
+
+            <div className="field-row">
+              <label>Text Alignment</label>
+              <div className="segmented segmented-four">
+                {(['left', 'center', 'right', 'justify'] as TextAlign[]).map((align) => (
+                  <button
+                    key={align}
+                    className={font.textAlign === align ? 'active' : ''}
+                    onClick={() => setFont((current) => ({ ...current, textAlign: align }))}
+                  >
+                    {align.charAt(0).toUpperCase() + align.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <label className="toggle-row">

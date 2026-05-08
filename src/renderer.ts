@@ -20,16 +20,40 @@ export type AnimationStyle =
   | 'luxury-title'
   | 'tech-hud';
 
+export type TypographyStyle =
+  | 'motion'
+  | 'animated'
+  | 'fluid'
+  | 'three-d'
+  | 'particle'
+  | 'glitch-typography'
+  | 'mask-reveal'
+  | 'handwritten'
+  | 'bounce-typography'
+  | 'cinematic'
+  | 'minimal'
+  | 'sync'
+  | 'morph'
+  | 'neon'
+  | 'liquid'
+  | 'retro'
+  | 'ui-tech'
+  | 'explosive'
+  | 'scroll-based'
+  | 'ai-cyberpunk';
+
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 export type HighlightShape = 'pill' | 'box' | 'underline' | 'none';
 export type CaptionPosition = 'upper' | 'center' | 'lower' | 'safe-lower';
 export type SafeAreaPreset = 'none' | 'tiktok' | 'reels' | 'shorts';
+export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 
 export type CaptionScene = {
   id: string;
   title: string;
   text: string;
-  style: AnimationStyle;
+  animationStyle: AnimationStyle;
+  typographyStyle: TypographyStyle;
   accent: string;
   duration: number;
 };
@@ -46,6 +70,7 @@ export type FontControls = {
   highlightShape: HighlightShape;
   maxWordsPerLine: number;
   position: CaptionPosition;
+  textAlign: TextAlign;
 };
 
 export type BrandKit = {
@@ -78,6 +103,7 @@ type WordToken = {
   width: number;
   emphasis: number;
   active: boolean;
+  justifyGap: number;
 };
 
 type ActiveScene = {
@@ -97,7 +123,7 @@ export const PRESETS: Record<AspectRatio, { width: number; height: number; label
 };
 
 export const DEFAULT_FONT: FontControls = {
-  family: 'Inter, Arial, sans-serif',
+  family: 'Bebas Neue, Impact, sans-serif',
   weight: 900,
   sizeScale: 1,
   uppercase: true,
@@ -107,7 +133,8 @@ export const DEFAULT_FONT: FontControls = {
   shadowBlur: 24,
   highlightShape: 'pill',
   maxWordsPerLine: 4,
-  position: 'center'
+  position: 'center',
+  textAlign: 'center'
 };
 
 export const DEFAULT_BRAND: BrandKit = {
@@ -116,6 +143,24 @@ export const DEFAULT_BRAND: BrandKit = {
   watermark: 'Kinetic Text',
   watermarkEnabled: false
 };
+
+export const FONT_FAMILIES: { label: string; family: string; weight: number }[] = [
+  { label: 'Bebas Neue', family: 'Bebas Neue, Impact, sans-serif', weight: 400 },
+  { label: 'Anton', family: 'Anton, Impact, sans-serif', weight: 400 },
+  { label: 'Montserrat', family: 'Montserrat, Arial, sans-serif', weight: 800 },
+  { label: 'Poppins', family: 'Poppins, Arial, sans-serif', weight: 800 },
+  { label: 'Oswald', family: 'Oswald, Arial Narrow, sans-serif', weight: 700 },
+  { label: 'League Spartan', family: 'League Spartan, Arial, sans-serif', weight: 800 },
+  { label: 'Orbitron', family: 'Orbitron, ui-monospace, monospace', weight: 800 },
+  { label: 'Exo 2', family: 'Exo 2, Arial, sans-serif', weight: 800 },
+  { label: 'Cinzel', family: 'Cinzel, Georgia, serif', weight: 700 },
+  { label: 'Barlow Condensed', family: 'Barlow Condensed, Arial Narrow, sans-serif', weight: 800 },
+  { label: 'Teko', family: 'Teko, Arial Narrow, sans-serif', weight: 700 },
+  { label: 'Rajdhani', family: 'Rajdhani, Arial, sans-serif', weight: 700 },
+  { label: 'Audiowide', family: 'Audiowide, ui-monospace, monospace', weight: 400 },
+  { label: 'Archivo Black', family: 'Archivo Black, Arial Black, sans-serif', weight: 400 },
+  { label: 'Russo One', family: 'Russo One, Arial Black, sans-serif', weight: 400 }
+];
 
 export const STYLE_PRESETS: { id: AnimationStyle; label: string; description: string }[] = [
   { id: 'tiktok-bounce', label: 'TikTok Bounce', description: 'Centered captions with energetic bounce.' },
@@ -140,45 +185,126 @@ export const STYLE_PRESETS: { id: AnimationStyle; label: string; description: st
   { id: 'drift', label: 'Drift', description: 'Smooth floating motion for calm edits.' }
 ];
 
+export const TYPOGRAPHY_PRESETS: { id: TypographyStyle; label: string; description: string }[] = [
+  { id: 'motion', label: 'Motion Typography', description: 'Directional streaks and dynamic movement accents.' },
+  { id: 'animated', label: 'Animated Typography', description: 'Fade, zoom, rotate, and slide visual treatment.' },
+  { id: 'fluid', label: 'Fluid Typography', description: 'Wave distortion and elastic flow.' },
+  { id: 'three-d', label: '3D Typography', description: 'Layered shadow depth and perspective skew.' },
+  { id: 'particle', label: 'Particle Typography', description: 'Dotted text fill and particle sparkle simulation.' },
+  { id: 'glitch-typography', label: 'Glitch Typography', description: 'RGB split, jitter, and digital noise.' },
+  { id: 'mask-reveal', label: 'Mask Reveal Typography', description: 'Wipe and clipping reveal treatment.' },
+  { id: 'handwritten', label: 'Handwritten Typography', description: 'Progressive draw-style reveal.' },
+  { id: 'bounce-typography', label: 'Bounce Typography', description: 'Rounded elastic visual treatment.' },
+  { id: 'cinematic', label: 'Cinematic Typography', description: 'Dramatic scale, depth, and strong shadow.' },
+  { id: 'minimal', label: 'Minimal Typography', description: 'Clean flat type with subtle opacity.' },
+  { id: 'sync', label: 'Sync Typography', description: 'Time-based beat pulse emphasis.' },
+  { id: 'morph', label: 'Morph Typography', description: 'Crossfade and scale morph approximation.' },
+  { id: 'neon', label: 'Neon Typography', description: 'Glow and flicker treatment.' },
+  { id: 'liquid', label: 'Liquid Typography', description: 'Drip and water-like offsets.' },
+  { id: 'retro', label: 'Retro Typography', description: 'Arcade colors and scanline accents.' },
+  { id: 'ui-tech', label: 'UI / Tech Typography', description: 'HUD brackets and futuristic interface accents.' },
+  { id: 'explosive', label: 'Explosive Typography', description: 'Burst lines, sparks, and impact styling.' },
+  { id: 'scroll-based', label: 'Scroll-Based Typography', description: 'Scroll-style visual flow inside the video.' },
+  { id: 'ai-cyberpunk', label: 'AI / Cyberpunk Typography', description: 'Holographic magenta/cyan cyber styling.' }
+];
+
 export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionScene, 'id'>[] }[] = [
   {
     id: 'viral-explainer',
     label: 'Hook - Problem - Solution - CTA',
     scenes: [
-      { title: 'Hook', text: 'Stop scrolling.', style: 'tiktok-bounce', accent: '#FF3B30', duration: 2.2 },
+      {
+        title: 'Hook',
+        text: 'Stop scrolling.',
+        animationStyle: 'tiktok-bounce',
+        typographyStyle: 'cinematic',
+        accent: '#FF3B30',
+        duration: 2.2
+      },
       {
         title: 'Problem',
         text: 'Most captions fail because they move too slowly.',
-        style: 'caption-stack',
+        animationStyle: 'caption-stack',
+        typographyStyle: 'motion',
         accent: '#FFD60A',
         duration: 5
       },
       {
         title: 'Solution',
         text: 'Use short beats and highlight one idea at a time.',
-        style: 'karaoke',
+        animationStyle: 'karaoke',
+        typographyStyle: 'sync',
         accent: '#64D2FF',
         duration: 5.5
       },
-      { title: 'CTA', text: 'Export it with a transparent background.', style: 'word-zoom', accent: '#32D74B', duration: 3.5 }
+      {
+        title: 'CTA',
+        text: 'Export it with a transparent background.',
+        animationStyle: 'word-zoom',
+        typographyStyle: 'neon',
+        accent: '#32D74B',
+        duration: 3.5
+      }
     ]
   },
   {
     id: 'news-update',
     label: 'Breaking - Detail - Takeaway',
     scenes: [
-      { title: 'Breaking', text: 'Breaking update', style: 'stomp', accent: '#FF3B30', duration: 2 },
-      { title: 'Detail', text: 'Here is the detail your audience needs to know.', style: 'news-ticker', accent: '#FFD60A', duration: 6 },
-      { title: 'Takeaway', text: 'The important part is what changes next.', style: 'clean-subtitle', accent: '#64D2FF', duration: 4 }
+      {
+        title: 'Breaking',
+        text: 'Breaking update',
+        animationStyle: 'stomp',
+        typographyStyle: 'explosive',
+        accent: '#FF3B30',
+        duration: 2
+      },
+      {
+        title: 'Detail',
+        text: 'Here is the detail your audience needs to know.',
+        animationStyle: 'news-ticker',
+        typographyStyle: 'retro',
+        accent: '#FFD60A',
+        duration: 6
+      },
+      {
+        title: 'Takeaway',
+        text: 'The important part is what changes next.',
+        animationStyle: 'clean-subtitle',
+        typographyStyle: 'minimal',
+        accent: '#64D2FF',
+        duration: 4
+      }
     ]
   },
   {
     id: 'product-demo',
     label: 'Title - Feature - Proof',
     scenes: [
-      { title: 'Title', text: 'One workflow. Cleaner videos.', style: 'luxury-title', accent: '#F4F2EA', duration: 3 },
-      { title: 'Feature', text: 'Build animated captions scene by scene.', style: 'tech-hud', accent: '#64D2FF', duration: 5 },
-      { title: 'Proof', text: 'Preview in real time and export in HD.', style: 'shorts-pop', accent: '#32D74B', duration: 4 }
+      {
+        title: 'Title',
+        text: 'One workflow. Cleaner videos.',
+        animationStyle: 'luxury-title',
+        typographyStyle: 'three-d',
+        accent: '#F4F2EA',
+        duration: 3
+      },
+      {
+        title: 'Feature',
+        text: 'Build animated captions scene by scene.',
+        animationStyle: 'tech-hud',
+        typographyStyle: 'ui-tech',
+        accent: '#64D2FF',
+        duration: 5
+      },
+      {
+        title: 'Proof',
+        text: 'Preview in real time and export in HD.',
+        animationStyle: 'shorts-pop',
+        typographyStyle: 'ai-cyberpunk',
+        accent: '#32D74B',
+        duration: 4
+      }
     ]
   }
 ];
@@ -220,7 +346,8 @@ export function createScene(partial: Partial<CaptionScene> = {}): CaptionScene {
     id: partial.id ?? crypto.randomUUID(),
     title: partial.title ?? 'Scene',
     text: partial.text ?? DEFAULT_TEXT,
-    style: partial.style ?? 'tiktok-bounce',
+    animationStyle: partial.animationStyle ?? 'tiktok-bounce',
+    typographyStyle: partial.typographyStyle ?? 'cinematic',
     accent: partial.accent ?? '#FF3B30',
     duration: partial.duration ?? estimateDuration(partial.text ?? DEFAULT_TEXT)
   };
@@ -267,7 +394,10 @@ function getBaseFontSize(settings: RenderSettings, scene: CaptionScene) {
 function prepareContext(ctx: CanvasRenderingContext2D, settings: RenderSettings, scene: CaptionScene) {
   const fontSize = getBaseFontSize(settings, scene);
   const family = settings.font.family || settings.brand.fontFamily || DEFAULT_FONT.family;
-  const fontFamily = scene.style === 'tech-hud' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : family;
+  const fontFamily =
+    scene.animationStyle === 'tech-hud' || scene.typographyStyle === 'ui-tech'
+      ? 'Orbitron, Rajdhani, ui-monospace, SFMono-Regular, Menlo, monospace'
+      : family;
   ctx.font = `${settings.font.weight} ${fontSize}px ${fontFamily}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
@@ -320,17 +450,17 @@ function getActiveWordIndex(scene: CaptionScene, wordCount: number, localTime: n
 }
 
 function getVisibleWordRange(scene: CaptionScene, settings: RenderSettings, words: string[], activeIndex: number) {
-  if (scene.style === 'news-ticker' || words.length <= settings.font.maxWordsPerLine * 2) {
+  if (scene.animationStyle === 'news-ticker' || scene.typographyStyle === 'scroll-based' || words.length <= settings.font.maxWordsPerLine * 2) {
     return { start: 0, end: words.length };
   }
 
   const max = Math.max(3, settings.font.maxWordsPerLine);
-  if (scene.style === 'caption-stack') {
+  if (scene.animationStyle === 'caption-stack') {
     const end = Math.min(words.length, activeIndex + 2);
     return { start: Math.max(0, end - max * 3), end };
   }
 
-  if (scene.style === 'karaoke' || scene.style === 'clean-subtitle' || scene.style === 'lower-third') {
+  if (scene.animationStyle === 'karaoke' || scene.animationStyle === 'clean-subtitle' || scene.animationStyle === 'lower-third') {
     const start = Math.max(0, activeIndex - max);
     return { start, end: Math.min(words.length, start + max * 3) };
   }
@@ -346,7 +476,7 @@ function getPositionY(settings: RenderSettings, scene: CaptionScene, lineCount: 
   const lower = settings.height * (1 - safe.bottom) - contentHeight / 2 - lineHeight * 0.7;
   const center = settings.height * 0.5 - contentHeight / 2;
 
-  if (scene.style === 'lower-third' || scene.style === 'news-ticker') {
+  if (scene.animationStyle === 'lower-third' || scene.animationStyle === 'news-ticker') {
     return lower - contentHeight / 2;
   }
   if (settings.font.position === 'upper') {
@@ -371,7 +501,7 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
   const lineHeight = fontSize * settings.font.lineHeight;
   const safe = getSafeBounds(settings);
   const maxWidth =
-    scene.style === 'lower-third' || scene.style === 'news-ticker'
+    scene.animationStyle === 'lower-third' || scene.animationStyle === 'news-ticker'
       ? settings.width * (1 - safe.left - safe.right) * 0.84
       : settings.width * (1 - safe.left - safe.right);
   const lineWords: Omit<WordToken, 'line' | 'x' | 'y'>[][] = [];
@@ -399,7 +529,8 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
       end: timing.end,
       width,
       emphasis: clean.length > 7 || /[!?]$/.test(word) ? 1 : 0,
-      active: sourceIndex === activeIndex
+      active: sourceIndex === activeIndex,
+      justifyGap: 0
     });
     currentWidth += (current.length > 1 ? gap : 0) + width;
   });
@@ -419,18 +550,26 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
   const startY = getPositionY(settings, scene, lineWords.length, lineHeight);
   return lineWords.flatMap((line, lineIndex) => {
     const lineWidth = line.reduce((sum, word, i) => sum + word.width + (i > 0 ? gap : 0), 0);
-    let x =
-      scene.style === 'lower-third' || scene.style === 'news-ticker'
-        ? settings.width * safe.left
-        : settings.width * 0.5 - lineWidth / 2;
+    const availableWidth = settings.width * (1 - safe.left - safe.right);
+    const leftX = settings.width * safe.left;
+    const rightX = settings.width * (1 - safe.right);
+    const shouldJustify = settings.font.textAlign === 'justify' && lineIndex < lineWords.length - 1 && line.length > 1;
+    const extraGap = shouldJustify ? Math.max(0, (availableWidth - lineWidth) / (line.length - 1)) : 0;
+    let x = leftX;
+    if (settings.font.textAlign === 'center' || settings.font.textAlign === 'justify') {
+      x = shouldJustify ? leftX : settings.width * 0.5 - lineWidth / 2;
+    } else if (settings.font.textAlign === 'right') {
+      x = rightX - lineWidth;
+    }
     return line.map((word) => {
       const token = {
         ...word,
+        justifyGap: extraGap,
         line: lineIndex,
         x,
         y: startY + lineIndex * lineHeight
       };
-      x += word.width + gap;
+      x += word.width + gap + extraGap;
       return token;
     });
   });
@@ -537,7 +676,7 @@ function getStyleTransform(
     skewX: 0
   };
 
-  switch (scene.style) {
+  switch (scene.animationStyle) {
     case 'cascade':
       return { ...base, y: base.y + (1 - intro) * (fontSize * 0.9 + token.line * 18), rotation: (1 - intro) * -0.05 };
     case 'typewriter':
@@ -596,19 +735,32 @@ function drawTextEffects(
   localTime: number,
   fontSize: number
 ) {
-  if (scene.style !== 'glitch' && scene.style !== 'tech-hud') {
+  if (
+    scene.typographyStyle !== 'glitch-typography' &&
+    scene.typographyStyle !== 'ui-tech' &&
+    scene.typographyStyle !== 'particle' &&
+    scene.typographyStyle !== 'retro' &&
+    scene.typographyStyle !== 'explosive' &&
+    scene.typographyStyle !== 'ai-cyberpunk' &&
+    scene.typographyStyle !== 'motion' &&
+    scene.typographyStyle !== 'fluid' &&
+    scene.typographyStyle !== 'liquid' &&
+    scene.typographyStyle !== 'cinematic' &&
+    scene.typographyStyle !== 'neon' &&
+    scene.typographyStyle !== 'scroll-based'
+  ) {
     return;
   }
 
   const letterSpacing = settings.font.letterSpacing;
   ctx.save();
-  if (scene.style === 'glitch') {
+  if (scene.typographyStyle === 'glitch-typography' || scene.typographyStyle === 'ai-cyberpunk') {
     ctx.globalAlpha = token.active ? 0.45 : 0.18;
-    ctx.fillStyle = '#64D2FF';
+    ctx.fillStyle = scene.typographyStyle === 'ai-cyberpunk' ? '#00F5FF' : '#64D2FF';
     fillText(ctx, token.value, -fontSize * 0.05, -fontSize * 0.03, letterSpacing);
-    ctx.fillStyle = '#FF3B30';
+    ctx.fillStyle = scene.typographyStyle === 'ai-cyberpunk' ? '#FF2BD6' : '#FF3B30';
     fillText(ctx, token.value, fontSize * 0.05, fontSize * 0.03, letterSpacing);
-  } else {
+  } else if (scene.typographyStyle === 'ui-tech') {
     ctx.globalAlpha = token.active ? 0.7 : 0.22;
     ctx.strokeStyle = scene.accent;
     ctx.lineWidth = Math.max(2, fontSize * 0.025);
@@ -621,8 +773,141 @@ function drawTextEffects(
     ctx.globalAlpha = 0.28;
     ctx.fillStyle = scene.accent;
     ctx.fillRect(-fontSize * 0.2, fontSize * 0.68, token.width + fontSize * 0.4, Math.max(3, fontSize * 0.035));
+  } else if (scene.typographyStyle === 'particle') {
+    ctx.globalAlpha = token.active ? 0.72 : 0.34;
+    ctx.fillStyle = scene.accent;
+    const dot = Math.max(2, fontSize * 0.035);
+    for (let x = 0; x < token.width; x += dot * 3.1) {
+      const y = Math.sin((x + localTime * 80 + token.sourceIndex * 13) * 0.05) * fontSize * 0.2;
+      ctx.beginPath();
+      ctx.arc(x, y, dot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (scene.typographyStyle === 'retro') {
+    ctx.globalAlpha = 0.28;
+    ctx.strokeStyle = '#FFD60A';
+    ctx.lineWidth = Math.max(2, fontSize * 0.02);
+    for (let y = -fontSize * 0.55; y < fontSize * 0.6; y += fontSize * 0.16) {
+      ctx.beginPath();
+      ctx.moveTo(-fontSize * 0.18, y);
+      ctx.lineTo(token.width + fontSize * 0.18, y);
+      ctx.stroke();
+    }
+  } else if (scene.typographyStyle === 'explosive') {
+    ctx.globalAlpha = token.active ? 0.75 : 0.22;
+    ctx.strokeStyle = '#FF7A00';
+    ctx.lineWidth = Math.max(3, fontSize * 0.03);
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8 + localTime * 0.5;
+      const start = fontSize * 0.45;
+      const end = fontSize * (0.75 + (i % 3) * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(token.width / 2 + Math.cos(angle) * start, Math.sin(angle) * start);
+      ctx.lineTo(token.width / 2 + Math.cos(angle) * end, Math.sin(angle) * end);
+      ctx.stroke();
+    }
+  } else if (scene.typographyStyle === 'motion') {
+    ctx.globalAlpha = token.active ? 0.55 : 0.22;
+    ctx.strokeStyle = scene.accent;
+    ctx.lineWidth = Math.max(3, fontSize * 0.035);
+    for (let i = 0; i < 4; i += 1) {
+      const y = -fontSize * 0.34 + i * fontSize * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(-fontSize * (0.9 + i * 0.18), y);
+      ctx.lineTo(-fontSize * 0.18, y);
+      ctx.stroke();
+    }
+  } else if (scene.typographyStyle === 'fluid' || scene.typographyStyle === 'liquid') {
+    ctx.globalAlpha = token.active ? 0.52 : 0.2;
+    ctx.fillStyle = scene.typographyStyle === 'liquid' ? '#45D9FF' : scene.accent;
+    for (let i = 0; i < 5; i += 1) {
+      const x = (token.width / 5) * i + Math.sin(localTime * 3 + i) * fontSize * 0.05;
+      const h = fontSize * (0.18 + (i % 3) * 0.09);
+      roundRect(ctx, x, fontSize * 0.42, fontSize * 0.07, h, fontSize * 0.04);
+      ctx.fill();
+    }
+  } else if (scene.typographyStyle === 'cinematic') {
+    ctx.globalAlpha = 0.38;
+    ctx.fillStyle = scene.accent;
+    ctx.fillRect(-fontSize * 0.18, -fontSize * 0.78, token.width + fontSize * 0.36, Math.max(4, fontSize * 0.035));
+    ctx.fillRect(-fontSize * 0.18, fontSize * 0.74, token.width + fontSize * 0.36, Math.max(4, fontSize * 0.035));
+  } else if (scene.typographyStyle === 'neon') {
+    ctx.globalAlpha = token.active ? 0.6 : 0.3;
+    ctx.strokeStyle = scene.accent;
+    ctx.lineWidth = Math.max(2, fontSize * 0.025);
+    strokeText(ctx, token.value, 0, 0, letterSpacing);
+  } else if (scene.typographyStyle === 'scroll-based') {
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = scene.accent;
+    ctx.lineWidth = Math.max(2, fontSize * 0.025);
+    ctx.beginPath();
+    ctx.moveTo(token.width + fontSize * 0.25, -fontSize * 0.42);
+    ctx.lineTo(token.width + fontSize * 0.48, -fontSize * 0.18);
+    ctx.lineTo(token.width + fontSize * 0.25, fontSize * 0.06);
+    ctx.moveTo(token.width + fontSize * 0.25, fontSize * 0.16);
+    ctx.lineTo(token.width + fontSize * 0.48, fontSize * 0.4);
+    ctx.lineTo(token.width + fontSize * 0.25, fontSize * 0.64);
+    ctx.stroke();
   }
   ctx.restore();
+}
+
+function applyTypographyTransform(
+  transform: ReturnType<typeof getStyleTransform>,
+  token: WordToken,
+  scene: CaptionScene,
+  localTime: number,
+  fontSize: number
+) {
+  const intro = easeOutCubic((localTime - token.start) / 0.36);
+  const pulse = token.active ? Math.sin(localTime * Math.PI * 3.5 + token.sourceIndex) : 0;
+
+  switch (scene.typographyStyle) {
+    case 'motion':
+      return { ...transform, x: transform.x + (1 - intro) * -fontSize * 0.55 };
+    case 'animated':
+      return { ...transform, rotation: transform.rotation + (1 - intro) * -0.12, scale: transform.scale * (0.82 + intro * 0.18) };
+    case 'fluid':
+      return { ...transform, y: transform.y + Math.sin(localTime * 3 + token.sourceIndex) * fontSize * 0.08 };
+    case 'three-d':
+      return { ...transform, skewX: transform.skewX - 0.12, y: transform.y - token.line * fontSize * 0.02 };
+    case 'particle':
+      return { ...transform, alpha: transform.alpha * (token.active ? 0.92 : 0.72) };
+    case 'glitch-typography': {
+      const jitter = Math.sin((localTime + token.sourceIndex) * 90) * fontSize * 0.025;
+      return { ...transform, x: transform.x + jitter, skewX: transform.skewX + jitter * 0.006 };
+    }
+    case 'mask-reveal':
+      return { ...transform, x: transform.x + (1 - intro) * fontSize * 0.25 };
+    case 'handwritten':
+      return { ...transform, alpha: clamp((localTime - token.start) / 0.65, 0, 1) };
+    case 'bounce-typography':
+      return { ...transform, scale: transform.scale * (0.9 + easeOutBack((localTime - token.start) / 0.42) * 0.12) };
+    case 'cinematic':
+      return { ...transform, scale: transform.scale * (1.04 + (token.active ? 0.04 : 0)), y: transform.y - (1 - intro) * fontSize * 0.2 };
+    case 'minimal':
+      return { ...transform, alpha: transform.alpha * 0.9 };
+    case 'sync':
+      return { ...transform, scale: transform.scale * (1 + Math.max(0, pulse) * 0.055) };
+    case 'morph':
+      return { ...transform, scale: transform.scale * (0.82 + intro * 0.18), alpha: transform.alpha * (0.75 + intro * 0.25) };
+    case 'neon':
+      return { ...transform, alpha: transform.alpha * (0.86 + Math.abs(Math.sin(localTime * 16 + token.sourceIndex)) * 0.14) };
+    case 'liquid':
+      return { ...transform, y: transform.y + Math.sin(localTime * 4 + token.sourceIndex * 0.9) * fontSize * 0.1 };
+    case 'retro':
+      return { ...transform, skewX: transform.skewX - 0.08 };
+    case 'ui-tech':
+      return { ...transform, x: transform.x + (1 - intro) * -fontSize * 0.18 };
+    case 'explosive':
+      return { ...transform, scale: transform.scale * (1.22 - intro * 0.22), rotation: transform.rotation + (1 - intro) * 0.08 };
+    case 'scroll-based':
+      return { ...transform, y: transform.y - localTime * fontSize * 0.22 };
+    case 'ai-cyberpunk':
+      return { ...transform, skewX: transform.skewX - 0.08, alpha: transform.alpha * (0.88 + Math.abs(Math.sin(localTime * 20)) * 0.12) };
+    default:
+      return transform;
+  }
 }
 
 function drawWord(
@@ -633,7 +918,7 @@ function drawWord(
   localTime: number,
   fontSize: number
 ) {
-  const transform = getStyleTransform(token, scene, settings, localTime, fontSize);
+  const transform = applyTypographyTransform(getStyleTransform(token, scene, settings, localTime, fontSize), token, scene, localTime, fontSize);
   if (transform.alpha <= 0) {
     return;
   }
@@ -650,47 +935,90 @@ function drawWord(
   drawTextEffects(ctx, token, settings, scene, localTime, fontSize);
 
   const letterSpacing = settings.font.letterSpacing;
+  const isNeon = scene.typographyStyle === 'neon' || scene.animationStyle === 'neon-flicker';
   ctx.shadowColor =
-    scene.style === 'neon-flicker' ? scene.accent : scene.style === 'luxury-title' ? 'rgba(255,255,255,0.38)' : 'rgba(0,0,0,0.72)';
-  ctx.shadowBlur = token.active ? settings.font.shadowBlur * 1.55 : settings.font.shadowBlur;
+    isNeon || scene.typographyStyle === 'ai-cyberpunk'
+      ? scene.accent
+      : scene.typographyStyle === 'cinematic' || scene.animationStyle === 'luxury-title'
+        ? 'rgba(255,255,255,0.38)'
+        : 'rgba(0,0,0,0.72)';
+  ctx.shadowBlur = token.active || isNeon ? settings.font.shadowBlur * 1.55 : settings.font.shadowBlur;
   ctx.shadowOffsetY = token.active ? 8 : 5;
   ctx.lineWidth = Math.max(0, fontSize * settings.font.strokeWidth);
-  ctx.strokeStyle = scene.style === 'comic-pop' ? '#111111' : 'rgba(0, 0, 0, 0.52)';
+  ctx.strokeStyle =
+    scene.animationStyle === 'comic-pop' || scene.typographyStyle === 'bounce-typography'
+      ? '#111111'
+      : scene.typographyStyle === 'three-d'
+        ? 'rgba(255,255,255,0.25)'
+        : 'rgba(0, 0, 0, 0.52)';
   if (settings.font.strokeWidth > 0) {
+    if (scene.typographyStyle === 'three-d' || scene.typographyStyle === 'cinematic') {
+      ctx.save();
+      ctx.globalAlpha *= 0.5;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      for (let i = 7; i >= 1; i -= 1) {
+        fillText(ctx, token.value, i * fontSize * 0.035, i * fontSize * 0.035, letterSpacing);
+      }
+      ctx.restore();
+    }
     strokeText(ctx, token.value, 0, 0, letterSpacing);
   }
 
-  if (scene.style === 'luxury-title') {
-    ctx.fillStyle = token.active ? '#FFFFFF' : '#E7DCC2';
-  } else if (scene.style === 'tech-hud') {
+  if (scene.typographyStyle === 'liquid') {
+    ctx.fillStyle = token.active ? '#B8F3FF' : '#42D9FF';
+  } else if (scene.typographyStyle === 'retro') {
+    ctx.fillStyle = token.active ? '#FFD60A' : '#FF7A00';
+  } else if (scene.typographyStyle === 'ui-tech' || scene.animationStyle === 'tech-hud') {
     ctx.fillStyle = token.active ? '#FFFFFF' : '#B9F3FF';
+  } else if (scene.typographyStyle === 'cinematic' || scene.animationStyle === 'luxury-title') {
+    ctx.fillStyle = token.active ? '#FFFFFF' : '#E7DCC2';
+  } else if (scene.typographyStyle === 'minimal') {
+    ctx.fillStyle = token.active ? '#FFFFFF' : 'rgba(244, 242, 234, 0.82)';
   } else {
-    ctx.fillStyle = token.active && scene.style !== 'karaoke' ? '#FFFFFF' : settings.foreground;
+    ctx.fillStyle = token.active && scene.animationStyle !== 'karaoke' ? '#FFFFFF' : settings.foreground;
   }
 
-  if (scene.style === 'typewriter') {
-    const reveal = clamp((localTime - token.start) / 0.24, 0, 1);
+  if (scene.animationStyle === 'typewriter' || scene.typographyStyle === 'mask-reveal' || scene.typographyStyle === 'handwritten') {
+    const reveal = clamp((localTime - token.start) / (scene.typographyStyle === 'handwritten' ? 0.72 : 0.24), 0, 1);
     ctx.beginPath();
     ctx.rect(-fontSize * 0.2, -fontSize * 0.75, token.width * reveal + fontSize * 0.2, fontSize * 1.5);
     ctx.clip();
   }
 
   fillText(ctx, token.value, 0, 0, letterSpacing);
+  if (scene.typographyStyle === 'handwritten') {
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = scene.accent;
+    ctx.lineWidth = Math.max(3, fontSize * 0.035);
+    ctx.beginPath();
+    ctx.moveTo(0, fontSize * 0.55);
+    ctx.quadraticCurveTo(token.width * 0.48, fontSize * 0.72, token.width, fontSize * 0.52);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
 
 function drawSceneBackdrop(ctx: CanvasRenderingContext2D, settings: RenderSettings, scene: CaptionScene, localTime: number) {
-  if (scene.style !== 'lower-third' && scene.style !== 'news-ticker' && scene.style !== 'tech-hud') {
+  if (
+    scene.animationStyle !== 'lower-third' &&
+    scene.animationStyle !== 'news-ticker' &&
+    scene.animationStyle !== 'tech-hud' &&
+    scene.typographyStyle !== 'ui-tech' &&
+    scene.typographyStyle !== 'retro'
+  ) {
     return;
   }
 
   const safe = getSafeBounds(settings);
-  const y = scene.style === 'tech-hud' ? settings.height * 0.72 : settings.height * (1 - safe.bottom) - settings.height * 0.12;
-  const h = settings.height * (scene.style === 'news-ticker' ? 0.1 : 0.14);
+  const isHud = scene.animationStyle === 'tech-hud' || scene.typographyStyle === 'ui-tech';
+  const y = isHud ? settings.height * 0.72 : settings.height * (1 - safe.bottom) - settings.height * 0.12;
+  const h = settings.height * (scene.animationStyle === 'news-ticker' ? 0.1 : 0.14);
   const intro = easeOutCubic(localTime / 0.38);
   ctx.save();
   ctx.globalAlpha = intro * 0.86;
-  ctx.fillStyle = scene.style === 'tech-hud' ? 'rgba(6, 18, 24, 0.84)' : 'rgba(0, 0, 0, 0.72)';
+  ctx.fillStyle = isHud ? 'rgba(6, 18, 24, 0.84)' : scene.typographyStyle === 'retro' ? 'rgba(24, 12, 6, 0.72)' : 'rgba(0, 0, 0, 0.72)';
   roundRect(ctx, settings.width * safe.left * 0.75, y, settings.width * (1 - safe.left - safe.right * 0.8), h, 18);
   ctx.fill();
   ctx.globalAlpha = intro;

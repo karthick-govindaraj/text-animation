@@ -193,6 +193,10 @@ select:focus {
   background: #101319;
 }
 
+.segmented-four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .segmented button,
 .ghost-button,
 .primary-button,
@@ -228,6 +232,23 @@ select:focus {
   max-height: 320px;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.typography-list {
+  max-height: 360px;
+}
+
+.current-pair {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .style-card {

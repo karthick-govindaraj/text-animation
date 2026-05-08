@@ -12,6 +12,12 @@ function waitForUi() {
   });
 }
 
+async function waitForFonts() {
+  if ('fonts' in document) {
+    await document.fonts.ready;
+  }
+}
+
 function getBitrate(settings: RenderSettings) {
   const pixels = settings.width * settings.height;
   const hdPixels = 1920 * 1080;
@@ -153,6 +159,7 @@ async function encodeFrames(
 
 export async function exportMp4(settings: RenderSettings, onProgress: ProgressCallback) {
   assertWebCodecs();
+  await waitForFonts();
 
   const target = new Mp4ArrayBufferTarget();
   const muxer = new Mp4Muxer({
@@ -176,6 +183,7 @@ export async function exportMp4(settings: RenderSettings, onProgress: ProgressCa
 
 export async function exportAlphaWebm(settings: RenderSettings, onProgress: ProgressCallback) {
   assertWebCodecs();
+  await waitForFonts();
 
   const target = new WebmArrayBufferTarget();
   const muxer = new WebmMuxer({
