@@ -311,17 +311,19 @@ export async function renderProjectAudio(settings: RenderSettings) {
 }
 
 export async function playPreviewAudio(settings: RenderSettings, startAt: number) {
-  const buffer = await renderProjectAudio(settings);
-  if (!buffer) {
-    return () => undefined;
-  }
-
   const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextConstructor) {
     return () => undefined;
   }
 
   const context = new AudioContextConstructor({ sampleRate: AUDIO_SAMPLE_RATE });
+  await context.resume().catch(() => undefined);
+  const buffer = await renderProjectAudio(settings);
+  if (!buffer) {
+    context.close().catch(() => undefined);
+    return () => undefined;
+  }
+
   const source = context.createBufferSource();
   const gain = context.createGain();
   source.buffer = buffer;

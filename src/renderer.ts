@@ -47,6 +47,39 @@ export type HighlightShape = 'pill' | 'box' | 'underline' | 'none';
 export type CaptionPosition = 'upper' | 'center' | 'lower' | 'safe-lower';
 export type SafeAreaPreset = 'none' | 'tiktok' | 'reels' | 'shorts';
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
+export type BackgroundMode = 'transparent' | 'solid' | 'gradient' | 'image' | 'video';
+export type BackgroundFit = 'cover' | 'contain' | 'stretch';
+export type AudioPresetId =
+  | 'cinematic-boom'
+  | 'bass-hit'
+  | 'whoosh'
+  | 'impact-hit'
+  | 'glitch-fx'
+  | 'rise-sweep'
+  | 'sub-drop'
+  | 'tick-clock-fx'
+  | 'reverse-cymbal'
+  | 'trailer-braam'
+  | 'ui-click-sounds'
+  | 'typewriter-fx'
+  | 'echo-hit'
+  | 'pulse-bass'
+  | 'trap-beat'
+  | 'phonk-beat'
+  | 'synthwave-beat'
+  | 'cyberpunk-ambience'
+  | 'epic-trailer-music'
+  | 'lo-fi-beat'
+  | 'glitch-bass'
+  | 'percussion-hits'
+  | 'stomp-beat'
+  | 'hybrid-orchestral-beat'
+  | 'edm-build-up'
+  | 'heartbeat-fx'
+  | 'vinyl-scratch'
+  | 'digital-beep-fx'
+  | 'neon-hum-ambience'
+  | 'vocal-chop-beat';
 
 export type CaptionScene = {
   id: string;
@@ -56,6 +89,7 @@ export type CaptionScene = {
   typographyStyle: TypographyStyle;
   accent: string;
   duration: number;
+  activeWordCount: number;
 };
 
 export type FontControls = {
@@ -80,6 +114,26 @@ export type BrandKit = {
   watermarkEnabled: boolean;
 };
 
+export type BackgroundSettings = {
+  mode: BackgroundMode;
+  solidColor: string;
+  gradientFrom: string;
+  gradientTo: string;
+  gradientDirection: number;
+  mediaDataUrl: string;
+  mediaName: string;
+  mediaFit: BackgroundFit;
+  includeInExport: boolean;
+};
+
+export type AudioSettings = {
+  enabled: boolean;
+  preset: AudioPresetId;
+  volume: number;
+  intensity: number;
+  autoSelect: boolean;
+};
+
 export type RenderSettings = {
   scenes: CaptionScene[];
   width: number;
@@ -90,6 +144,8 @@ export type RenderSettings = {
   brand: BrandKit;
   foreground: string;
   safeArea: SafeAreaPreset;
+  background: BackgroundSettings;
+  audio: AudioSettings;
 };
 
 type WordToken = {
@@ -142,6 +198,26 @@ export const DEFAULT_BRAND: BrandKit = {
   fontFamily: 'Inter, Arial, sans-serif',
   watermark: 'Kinetic Text',
   watermarkEnabled: false
+};
+
+export const DEFAULT_BACKGROUND: BackgroundSettings = {
+  mode: 'transparent',
+  solidColor: '#111318',
+  gradientFrom: '#111318',
+  gradientTo: '#29313f',
+  gradientDirection: 135,
+  mediaDataUrl: '',
+  mediaName: '',
+  mediaFit: 'cover',
+  includeInExport: false
+};
+
+export const DEFAULT_AUDIO: AudioSettings = {
+  enabled: false,
+  preset: 'pulse-bass',
+  volume: 0.55,
+  intensity: 0.65,
+  autoSelect: true
 };
 
 export const FONT_FAMILIES: { label: string; family: string; weight: number }[] = [
@@ -208,7 +284,7 @@ export const TYPOGRAPHY_PRESETS: { id: TypographyStyle; label: string; descripti
   { id: 'ai-cyberpunk', label: 'AI / Cyberpunk Typography', description: 'Holographic magenta/cyan cyber styling.' }
 ];
 
-export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionScene, 'id'>[] }[] = [
+export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionScene, 'id' | 'activeWordCount'>[] }[] = [
   {
     id: 'viral-explainer',
     label: 'Hook - Problem - Solution - CTA',
@@ -349,7 +425,8 @@ export function createScene(partial: Partial<CaptionScene> = {}): CaptionScene {
     animationStyle: partial.animationStyle ?? 'tiktok-bounce',
     typographyStyle: partial.typographyStyle ?? 'cinematic',
     accent: partial.accent ?? '#FF3B30',
-    duration: partial.duration ?? estimateDuration(partial.text ?? DEFAULT_TEXT)
+    duration: partial.duration ?? estimateDuration(partial.text ?? DEFAULT_TEXT),
+    activeWordCount: clamp(Math.round(partial.activeWordCount ?? 1), 1, 8)
   };
 }
 
@@ -493,6 +570,9 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
   const rawWords = source.split(' ').filter(Boolean);
   const words = settings.font.uppercase ? rawWords.map((word) => word.toUpperCase()) : rawWords;
   const activeIndex = getActiveWordIndex(scene, words.length, localTime);
+  const activeWordCount = clamp(Math.round(scene.activeWordCount || 1), 1, 8);
+  const activeWindowEnd = Math.min(words.length, activeIndex + activeWordCount);
+  const activeWindowTiming = getWordTiming(scene, words.length, activeIndex);
   const { start, end } = getVisibleWordRange(scene, settings, words, activeIndex);
   const visibleWords = words.slice(start, end);
   const fontSize = prepareContext(ctx, settings, scene);
@@ -511,6 +591,8 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
   visibleWords.forEach((word, visibleIndex) => {
     const sourceIndex = start + visibleIndex;
     const timing = getWordTiming(scene, words.length, sourceIndex);
+    const isActive = sourceIndex >= activeIndex && sourceIndex < activeWindowEnd;
+    const effectiveStart = isActive ? Math.min(timing.start, activeWindowTiming.start) : timing.start;
     const width = measureText(ctx, word, letterSpacing);
     const clean = word.replace(/[^\w'-]/g, '');
     const projected = currentWidth + (current.length > 0 ? gap : 0) + width;
@@ -525,11 +607,11 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
     current.push({
       value: word,
       sourceIndex,
-      start: timing.start,
-      end: timing.end,
+      start: effectiveStart,
+      end: isActive ? Math.max(timing.end, activeWindowTiming.end) : timing.end,
       width,
       emphasis: clean.length > 7 || /[!?]$/.test(word) ? 1 : 0,
-      active: sourceIndex === activeIndex,
+      active: isActive,
       justifyGap: 0
     });
     currentWidth += (current.length > 1 ? gap : 0) + width;
@@ -585,6 +667,219 @@ function drawTransparentGrid(ctx: CanvasRenderingContext2D, width: number, heigh
     }
   }
   ctx.restore();
+}
+
+type CachedImage = {
+  element: HTMLImageElement;
+  ready: boolean;
+  promise: Promise<void>;
+};
+
+type CachedVideo = {
+  element: HTMLVideoElement;
+  ready: boolean;
+  promise: Promise<void>;
+};
+
+const imageCache = new Map<string, CachedImage>();
+const videoCache = new Map<string, CachedVideo>();
+
+function getBackground(settings: RenderSettings) {
+  return settings.background ?? DEFAULT_BACKGROUND;
+}
+
+function shouldDrawBackground(settings: RenderSettings, preview = false) {
+  const background = getBackground(settings);
+  return background.mode !== 'transparent' && (preview || background.includeInExport);
+}
+
+function getFittedRect(
+  mediaWidth: number,
+  mediaHeight: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  fit: BackgroundFit
+) {
+  if (fit === 'stretch' || mediaWidth <= 0 || mediaHeight <= 0) {
+    return { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+  }
+
+  const scale =
+    fit === 'contain'
+      ? Math.min(canvasWidth / mediaWidth, canvasHeight / mediaHeight)
+      : Math.max(canvasWidth / mediaWidth, canvasHeight / mediaHeight);
+  const width = mediaWidth * scale;
+  const height = mediaHeight * scale;
+  return {
+    x: (canvasWidth - width) / 2,
+    y: (canvasHeight - height) / 2,
+    width,
+    height
+  };
+}
+
+function getCachedImage(dataUrl: string) {
+  const cached = imageCache.get(dataUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const element = new Image();
+  element.decoding = 'async';
+  const item: CachedImage = {
+    element,
+    ready: false,
+    promise: new Promise((resolve, reject) => {
+      element.onload = () => {
+        item.ready = true;
+        resolve();
+      };
+      element.onerror = () => reject(new Error('Unable to load background image.'));
+    })
+  };
+  element.src = dataUrl;
+  imageCache.set(dataUrl, item);
+  return item;
+}
+
+function getCachedVideo(dataUrl: string) {
+  const cached = videoCache.get(dataUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const element = document.createElement('video');
+  element.muted = true;
+  element.playsInline = true;
+  element.preload = 'auto';
+  const item: CachedVideo = {
+    element,
+    ready: false,
+    promise: new Promise((resolve, reject) => {
+      const markReady = () => {
+        item.ready = true;
+        resolve();
+      };
+      element.addEventListener('loadeddata', markReady, { once: true });
+      element.addEventListener('error', () => reject(new Error('Unable to load background video.')), { once: true });
+    })
+  };
+  element.src = dataUrl;
+  element.load();
+  videoCache.set(dataUrl, item);
+  return item;
+}
+
+function drawGradientBackground(ctx: CanvasRenderingContext2D, settings: RenderSettings, background: BackgroundSettings) {
+  const angle = ((background.gradientDirection - 90) * Math.PI) / 180;
+  const length = Math.max(settings.width, settings.height);
+  const centerX = settings.width / 2;
+  const centerY = settings.height / 2;
+  const x = Math.cos(angle) * length;
+  const y = Math.sin(angle) * length;
+  const gradient = ctx.createLinearGradient(centerX - x, centerY - y, centerX + x, centerY + y);
+  gradient.addColorStop(0, background.gradientFrom);
+  gradient.addColorStop(1, background.gradientTo);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, settings.width, settings.height);
+}
+
+function drawMediaBackground(
+  ctx: CanvasRenderingContext2D,
+  settings: RenderSettings,
+  media: CanvasImageSource,
+  mediaWidth: number,
+  mediaHeight: number
+) {
+  const rect = getFittedRect(mediaWidth, mediaHeight, settings.width, settings.height, getBackground(settings).mediaFit);
+  ctx.drawImage(media, rect.x, rect.y, rect.width, rect.height);
+}
+
+function drawBackground(ctx: CanvasRenderingContext2D, settings: RenderSettings, time: number, preview = false) {
+  const background = getBackground(settings);
+  if (!shouldDrawBackground(settings, preview)) {
+    if (preview) {
+      drawTransparentGrid(ctx, settings.width, settings.height);
+    }
+    return;
+  }
+
+  if (background.mode === 'solid') {
+    ctx.fillStyle = background.solidColor;
+    ctx.fillRect(0, 0, settings.width, settings.height);
+    return;
+  }
+
+  if (background.mode === 'gradient') {
+    drawGradientBackground(ctx, settings, background);
+    return;
+  }
+
+  if (background.mode === 'image' && background.mediaDataUrl) {
+    const image = getCachedImage(background.mediaDataUrl);
+    if (image.ready) {
+      drawMediaBackground(ctx, settings, image.element, image.element.naturalWidth, image.element.naturalHeight);
+    } else if (preview) {
+      ctx.fillStyle = '#090a0d';
+      ctx.fillRect(0, 0, settings.width, settings.height);
+    }
+    return;
+  }
+
+  if (background.mode === 'video' && background.mediaDataUrl) {
+    const video = getCachedVideo(background.mediaDataUrl);
+    if (video.ready && video.element.videoWidth > 0 && video.element.videoHeight > 0) {
+      const duration = Number.isFinite(video.element.duration) && video.element.duration > 0 ? video.element.duration : settings.duration;
+      const targetTime = duration > 0 ? time % duration : 0;
+      if (Math.abs(video.element.currentTime - targetTime) > 0.2) {
+        video.element.currentTime = targetTime;
+      }
+      drawMediaBackground(ctx, settings, video.element, video.element.videoWidth, video.element.videoHeight);
+    } else if (preview) {
+      ctx.fillStyle = '#090a0d';
+      ctx.fillRect(0, 0, settings.width, settings.height);
+    }
+    return;
+  }
+
+  if (preview) {
+    drawTransparentGrid(ctx, settings.width, settings.height);
+  }
+}
+
+async function prepareBackground(settings: RenderSettings, time: number, preview = false) {
+  const background = getBackground(settings);
+  if (!shouldDrawBackground(settings, preview)) {
+    return;
+  }
+
+  if (background.mode === 'image' && background.mediaDataUrl) {
+    await getCachedImage(background.mediaDataUrl).promise;
+  }
+
+  if (background.mode === 'video' && background.mediaDataUrl) {
+    const video = getCachedVideo(background.mediaDataUrl);
+    await video.promise;
+    const duration = Number.isFinite(video.element.duration) && video.element.duration > 0 ? video.element.duration : settings.duration;
+    const targetTime = duration > 0 ? time % duration : 0;
+    if (Math.abs(video.element.currentTime - targetTime) > 0.015) {
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const done = () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          video.element.removeEventListener('seeked', done);
+          window.clearTimeout(timer);
+          resolve();
+        };
+        const timer = window.setTimeout(done, 1200);
+        video.element.addEventListener('seeked', done, { once: true });
+        video.element.currentTime = targetTime;
+      });
+    }
+  }
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -1059,10 +1354,7 @@ export function renderFrame(
   }
 
   ctx.clearRect(0, 0, settings.width, settings.height);
-
-  if (options.preview) {
-    drawTransparentGrid(ctx, settings.width, settings.height);
-  }
+  drawBackground(ctx, settings, time, Boolean(options.preview));
 
   const { scene, localTime } = getActiveScene(settings, time);
   const fontSize = prepareContext(ctx, settings, scene);
@@ -1075,4 +1367,26 @@ export function renderFrame(
   if (options.preview && options.guides) {
     drawGuides(ctx, settings);
   }
+}
+
+export async function renderFrameAsync(
+  canvas: HTMLCanvasElement,
+  settings: RenderSettings,
+  time: number,
+  options: { preview?: boolean; guides?: boolean } = {}
+) {
+  await prepareBackground(settings, time, Boolean(options.preview));
+  renderFrame(canvas, settings, time, options);
+}
+
+export function canvasToPng(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('Unable to create PNG frame.'));
+      }
+    }, 'image/png');
+  });
 }

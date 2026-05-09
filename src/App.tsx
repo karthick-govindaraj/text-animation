@@ -5,8 +5,11 @@ import {
   Copy,
   Download,
   Film,
+  FolderOpen,
+  Image,
   Layers3,
   Loader2,
+  Music2,
   Palette,
   Pause,
   Play,
@@ -20,9 +23,21 @@ import {
   Wand2
 } from 'lucide-react';
 import {
+  AUDIO_PRESETS,
+  audioBufferToWav,
+  getAudioPresetLabel,
+  getSuggestedAudioPreset,
+  playPreviewAudio,
+  renderProjectAudio
+} from './audio';
+import {
   AspectRatio,
+  AudioSettings,
+  BackgroundSettings,
   BrandKit,
   CaptionScene,
+  DEFAULT_AUDIO,
+  DEFAULT_BACKGROUND,
   DEFAULT_BRAND,
   DEFAULT_FONT,
   FONT_FAMILIES,
@@ -40,7 +55,7 @@ import {
   getAspectSize,
   getFrameCount,
   getTotalDuration,
-  renderFrame
+  renderFrameAsync
 } from './renderer';
 import { exportAlphaWebm, exportMp4 } from './videoExport';
 
@@ -49,6 +64,23 @@ type ExportKind = 'mp4' | 'webm-alpha' | 'mov-alpha';
 const FF_VERSION = '0.12.10';
 const BRAND_STORAGE_KEY = 'kinetic-text-brand-kit';
 const FONT_STORAGE_KEY = 'kinetic-text-font-controls';
+const PROJECT_FILE_VERSION = 1;
+const IMAGE_LIMIT_BYTES = 10 * 1024 * 1024;
+const VIDEO_LIMIT_BYTES = 25 * 1024 * 1024;
+
+type ProjectFileV1 = {
+  version: 1;
+  createdAt: string;
+  scenes: CaptionScene[];
+  aspect: AspectRatio;
+  fps: number;
+  safeArea: SafeAreaPreset;
+  showGuides: boolean;
+  font: FontControls;
+  brand: BrandKit;
+  background: BackgroundSettings;
+  audio: AudioSettings;
+};
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -88,6 +120,8 @@ export default function App() {
   const rafRef = useRef<number | null>(null);
   const startRef = useRef(0);
   const pausedAtRef = useRef(0);
+  const stopAudioRef = useRef<(() => void) | null>(null);
+  const projectInputRef = useRef<HTMLInputElement | null>(null);
 
   const [scenes, setScenes] = useState<CaptionScene[]>(() => makeScenes());
   const [activeSceneId, setActiveSceneId] = useState('');
@@ -97,6 +131,8 @@ export default function App() {
   const [showGuides, setShowGuides] = useState(true);
   const [font, setFont] = useState<FontControls>(() => loadStoredValue(FONT_STORAGE_KEY, DEFAULT_FONT));
   const [brand, setBrand] = useState<BrandKit>(() => loadStoredValue(BRAND_STORAGE_KEY, DEFAULT_BRAND));
+  const [background, setBackground] = useState<BackgroundSettings>(DEFAULT_BACKGROUND);
+  const [audio, setAudio] = useState<AudioSettings>(DEFAULT_AUDIO);
   const [isPlaying, setIsPlaying] = useState(true);
   const [playhead, setPlayhead] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
@@ -118,9 +154,11 @@ export default function App() {
       font,
       brand,
       foreground: '#F4F2EA',
-      safeArea
+      safeArea,
+      background,
+      audio
     }),
-    [brand, duration, font, fps, safeArea, scenes, size.height, size.width]
+    [audio, background, brand, duration, font, fps, safeArea, scenes, size.height, size.width]
   );
 
   const frameCount = getFrameCount(settings);
@@ -141,6 +179,8 @@ export default function App() {
     localStorage.setItem(FONT_STORAGE_KEY, JSON.stringify(font));
   }, [font]);
 
+  useEffect(() => () => stopAudioPreview(), []);
+
   useEffect(() => {
     const canvas = previewRef.current;
     if (!canvas) {
@@ -155,11 +195,11 @@ export default function App() {
         const nextTime = duration > 0 ? ((now - startRef.current) / 1000) % duration : 0;
         pausedAtRef.current = nextTime;
         setPlayhead(nextTime);
-        renderFrame(canvas, settings, nextTime, { preview: true, guides: showGuides });
+        void renderFrameAsync(canvas, settings, nextTime, { preview: true, guides: showGuides });
         rafRef.current = requestAnimationFrame(draw);
       } else {
         startRef.current = 0;
-        renderFrame(canvas, settings, pausedAtRef.current, { preview: true, guides: showGuides });
+        void renderFrameAsync(canvas, settings, pausedAtRef.current, { preview: true, guides: showGuides });
       }
     };
 
@@ -176,9 +216,58 @@ export default function App() {
     pausedAtRef.current = Math.min(pausedAtRef.current, Math.max(0, duration - 0.01));
     const canvas = previewRef.current;
     if (canvas) {
-      renderFrame(canvas, settings, pausedAtRef.current, { preview: true, guides: showGuides });
+      void renderFrameAsync(canvas, settings, pausedAtRef.current, { preview: true, guides: showGuides });
     }
   }, [duration, settings, showGuides]);
+
+  useEffect(() => {
+    if (isPlaying && audio.enabled) {
+      void startAudioPreview();
+    } else if (!audio.enabled) {
+      stopAudioPreview();
+    }
+  }, [audio.enabled, audio.preset, audio.autoSelect, audio.volume, audio.intensity]);
+
+  const stopAudioPreview = () => {
+    stopAudioRef.current?.();
+    stopAudioRef.current = null;
+  };
+
+  const startAudioPreview = async () => {
+    stopAudioPreview();
+    if (!settings.audio.enabled) {
+      return;
+    }
+    try {
+      stopAudioRef.current = await playPreviewAudio(settings, pausedAtRef.current);
+    } catch (cause) {
+      console.warn('Audio preview unavailable:', cause);
+    }
+  };
+
+  const pausePreview = () => {
+    stopAudioPreview();
+    setIsPlaying(false);
+  };
+
+  const togglePlayback = () => {
+    if (isPlaying) {
+      pausePreview();
+      return;
+    }
+    startRef.current = 0;
+    void startAudioPreview();
+    setIsPlaying(true);
+  };
+
+  const previewAudioOnce = async () => {
+    setError('');
+    try {
+      await startAudioPreview();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Audio preview failed.');
+    }
+  };
 
   const getSceneStart = (sceneId: string) => {
     let cursor = 0;
@@ -195,6 +284,11 @@ export default function App() {
     setScenes((current) => current.map((scene) => (scene.id === sceneId ? { ...scene, ...patch } : scene)));
   };
 
+  const updateSceneActiveWordCount = (sceneId: string, value: number) => {
+    const next = Math.min(Math.max(Math.round(Number(value) || 1), 1), 8);
+    updateScene(sceneId, { activeWordCount: next });
+  };
+
   const addScene = () => {
     const scene = createScene({
       title: `Scene ${scenes.length + 1}`,
@@ -208,7 +302,7 @@ export default function App() {
     setActiveSceneId(scene.id);
     pausedAtRef.current = duration;
     setPlayhead(duration);
-    setIsPlaying(false);
+    pausePreview();
   };
 
   const duplicateScene = (scene: CaptionScene) => {
@@ -220,7 +314,7 @@ export default function App() {
       return next;
     });
     setActiveSceneId(duplicate.id);
-    setIsPlaying(false);
+    pausePreview();
   };
 
   const deleteScene = (sceneId: string) => {
@@ -243,17 +337,17 @@ export default function App() {
     setPlayhead(0);
     pausedAtRef.current = 0;
     startRef.current = 0;
-    setIsPlaying(false);
+    pausePreview();
   };
 
   const seek = (value: number) => {
     const next = Number(value);
     pausedAtRef.current = next;
     setPlayhead(next);
-    setIsPlaying(false);
+    pausePreview();
     const canvas = previewRef.current;
     if (canvas) {
-      renderFrame(canvas, settings, next, { preview: true, guides: showGuides });
+      void renderFrameAsync(canvas, settings, next, { preview: true, guides: showGuides });
     }
   };
 
@@ -295,7 +389,7 @@ export default function App() {
     for (let frame = 0; frame < frameCount; frame += 1) {
       const name = `frame_${String(frame + 1).padStart(4, '0')}.png`;
       const time = frame / fps;
-      renderFrame(canvas, settings, time, { preview: false });
+      await renderFrameAsync(canvas, settings, time, { preview: false });
       const blob = await canvasToPng(canvas);
       await ffmpeg.writeFile(name, await fetchFile(blob));
       names.push(name);
@@ -318,7 +412,7 @@ export default function App() {
     setError('');
     setIsExporting(true);
     setProgress(0);
-    setIsPlaying(false);
+    pausePreview();
 
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = settings.width;
@@ -352,14 +446,29 @@ export default function App() {
       ffmpeg = await loadFFmpeg();
       await waitForFonts();
       names = await writeFrames(ffmpeg, exportCanvas);
+      let hasAudio = false;
+      if (settings.audio.enabled) {
+        try {
+          setExportLabel('Rendering WAV audio');
+          const audioBuffer = await renderProjectAudio(settings);
+          if (audioBuffer) {
+            await ffmpeg.writeFile('audio.wav', await fetchFile(audioBufferToWav(audioBuffer)));
+            names.push('audio.wav');
+            hasAudio = true;
+          }
+        } catch (cause) {
+          console.warn('MOV audio export skipped:', cause);
+        }
+      }
       setExportLabel('Encoding alpha MOV');
       setProgress(48);
 
-      await ffmpeg.exec([
+      const movArgs = [
         '-framerate',
         String(fps),
         '-i',
         'frame_%04d.png',
+        ...(hasAudio ? ['-i', 'audio.wav'] : []),
         '-c:v',
         'prores_ks',
         '-profile:v',
@@ -368,8 +477,11 @@ export default function App() {
         'yuva444p10le',
         '-vendor',
         'apl0',
+        ...(hasAudio ? ['-c:a', 'pcm_s16le', '-shortest'] : []),
         output
-      ]);
+      ];
+
+      await ffmpeg.exec(movArgs);
 
       setExportLabel('Preparing download');
       const data = await ffmpeg.readFile(output);
@@ -387,9 +499,85 @@ export default function App() {
       setExportLabel('');
       const canvas = previewRef.current;
       if (canvas) {
-        renderFrame(canvas, settings, pausedAtRef.current, { preview: true, guides: showGuides });
+        void renderFrameAsync(canvas, settings, pausedAtRef.current, { preview: true, guides: showGuides });
       }
     }
+  };
+
+  const exportProjectFile = () => {
+    const project: ProjectFileV1 = {
+      version: PROJECT_FILE_VERSION,
+      createdAt: new Date().toISOString(),
+      scenes,
+      aspect,
+      fps,
+      safeArea,
+      showGuides,
+      font,
+      brand,
+      background,
+      audio
+    };
+    downloadBlob(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }), `${filePrefix()}-project.json`);
+  };
+
+  const importProjectFile = async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      const project = JSON.parse(await file.text()) as Partial<ProjectFileV1>;
+      if (project.version !== PROJECT_FILE_VERSION || !Array.isArray(project.scenes) || project.scenes.length === 0) {
+        throw new Error('Unsupported or invalid project file.');
+      }
+
+      const nextScenes = project.scenes.map((scene) => createScene(scene));
+      setScenes(nextScenes);
+      setActiveSceneId(nextScenes[0].id);
+      setAspect(project.aspect ?? '9:16');
+      setFps(project.fps ?? 30);
+      setSafeArea(project.safeArea ?? 'tiktok');
+      setShowGuides(project.showGuides ?? true);
+      setFont({ ...DEFAULT_FONT, ...(project.font ?? {}) });
+      setBrand({ ...DEFAULT_BRAND, ...(project.brand ?? {}) });
+      setBackground({ ...DEFAULT_BACKGROUND, ...(project.background ?? {}) });
+      setAudio({ ...DEFAULT_AUDIO, ...(project.audio ?? {}) });
+      pausedAtRef.current = 0;
+      setPlayhead(0);
+      pausePreview();
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Project import failed. Current project was not changed.');
+    } finally {
+      if (projectInputRef.current) {
+        projectInputRef.current.value = '';
+      }
+    }
+  };
+
+  const readBackgroundFile = async (file: File | null, mode: 'image' | 'video') => {
+    if (!file) {
+      return;
+    }
+    const limit = mode === 'image' ? IMAGE_LIMIT_BYTES : VIDEO_LIMIT_BYTES;
+    if (file.size > limit) {
+      setError(`${mode === 'image' ? 'Image' : 'Video'} background must be ${Math.round(limit / 1024 / 1024)} MB or smaller.`);
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('Unable to read background file.'));
+      reader.readAsDataURL(file);
+    });
+    setBackground((current) => ({
+      ...current,
+      mode,
+      mediaDataUrl: dataUrl,
+      mediaName: file.name
+    }));
+    setError('');
   };
 
   const updateBrandColor = (index: number, color: string) => {
@@ -413,7 +601,7 @@ export default function App() {
             </div>
           </div>
           <div className="topbar-actions">
-            <button className="ghost-button" onClick={() => setIsPlaying((value) => !value)}>
+            <button className="ghost-button" onClick={togglePlayback}>
               {isPlaying ? <Pause size={18} /> : <Play size={18} />}
               {isPlaying ? 'Pause' : 'Play'}
             </button>
@@ -460,6 +648,26 @@ export default function App() {
                     </small>
                   </span>
                 </button>
+              ))}
+            </div>
+
+            <div className="scene-word-controls">
+              <div className="scene-word-controls-title">Animated Words Per Scene</div>
+              {scenes.map((scene, index) => (
+                <label key={`${scene.id}-words`}>
+                  <span>
+                    {String(index + 1).padStart(2, '0')} · {scene.title}
+                  </span>
+                  <strong>{scene.activeWordCount}</strong>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    step="1"
+                    value={scene.activeWordCount}
+                    onChange={(event) => updateSceneActiveWordCount(scene.id, Number(event.target.value))}
+                  />
+                </label>
               ))}
             </div>
 
@@ -517,6 +725,28 @@ export default function App() {
                       onChange={(event) => updateScene(activeScene.id, { accent: event.target.value })}
                     />
                   </label>
+                  <label>
+                    Animated Words
+                    <input
+                      type="number"
+                      min="1"
+                      max="8"
+                      step="1"
+                      value={activeScene.activeWordCount}
+                      onChange={(event) => updateSceneActiveWordCount(activeScene.id, Number(event.target.value))}
+                    />
+                  </label>
+                </div>
+                <div className="field-row">
+                  <label>Animated Words at Once: {activeScene.activeWordCount}</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    step="1"
+                    value={activeScene.activeWordCount}
+                    onChange={(event) => updateSceneActiveWordCount(activeScene.id, Number(event.target.value))}
+                  />
                 </div>
               </>
             )}
@@ -775,6 +1005,99 @@ export default function App() {
 
             <div className="panel-divider" />
             <div className="panel-heading">
+              <Image size={18} />
+              <span>Background Options</span>
+            </div>
+            <div className="field-row">
+              <label>Preview Background</label>
+              <div className="segmented segmented-five">
+                {(['transparent', 'solid', 'gradient', 'image', 'video'] as BackgroundSettings['mode'][]).map((mode) => (
+                  <button
+                    key={mode}
+                    className={background.mode === mode ? 'active' : ''}
+                    onClick={() => setBackground((current) => ({ ...current, mode }))}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {background.mode === 'solid' && (
+              <div className="field-row">
+                <label>Solid Color</label>
+                <input
+                  type="color"
+                  value={background.solidColor}
+                  onChange={(event) => setBackground((current) => ({ ...current, solidColor: event.target.value }))}
+                />
+              </div>
+            )}
+            {background.mode === 'gradient' && (
+              <div className="field-grid">
+                <label>
+                  From
+                  <input
+                    type="color"
+                    value={background.gradientFrom}
+                    onChange={(event) => setBackground((current) => ({ ...current, gradientFrom: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  To
+                  <input
+                    type="color"
+                    value={background.gradientTo}
+                    onChange={(event) => setBackground((current) => ({ ...current, gradientTo: event.target.value }))}
+                  />
+                </label>
+                <label className="wide">
+                  Direction <strong>{background.gradientDirection}°</strong>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="15"
+                    value={background.gradientDirection}
+                    onChange={(event) => setBackground((current) => ({ ...current, gradientDirection: Number(event.target.value) }))}
+                  />
+                </label>
+              </div>
+            )}
+            {(background.mode === 'image' || background.mode === 'video') && (
+              <>
+                <div className="field-row">
+                  <label>{background.mode === 'image' ? 'Image Background' : 'Video Background'}</label>
+                  <input
+                    type="file"
+                    accept={background.mode === 'image' ? 'image/*' : 'video/*'}
+                    onChange={(event) => void readBackgroundFile(event.target.files?.[0] ?? null, background.mode as 'image' | 'video')}
+                  />
+                  {background.mediaName && <p className="format-note">{background.mediaName}</p>}
+                </div>
+                <div className="field-row">
+                  <label>Media Fit</label>
+                  <select
+                    value={background.mediaFit}
+                    onChange={(event) => setBackground((current) => ({ ...current, mediaFit: event.target.value as BackgroundSettings['mediaFit'] }))}
+                  >
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                    <option value="stretch">Stretch</option>
+                  </select>
+                </div>
+              </>
+            )}
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={background.includeInExport}
+                onChange={(event) => setBackground((current) => ({ ...current, includeInExport: event.target.checked }))}
+              />
+              Include background in export
+            </label>
+
+            <div className="panel-divider" />
+            <div className="panel-heading">
               <Palette size={18} />
               <span>Brand Kit</span>
             </div>
@@ -806,6 +1129,107 @@ export default function App() {
               />
               Render watermark
             </label>
+
+            <div className="panel-divider" />
+            <div className="panel-heading">
+              <Music2 size={18} />
+              <span>Audio Motion</span>
+            </div>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={audio.enabled}
+                onChange={(event) => {
+                  setAudio((current) => ({ ...current, enabled: event.target.checked }));
+                  if (!event.target.checked) {
+                    stopAudioPreview();
+                  }
+                }}
+              />
+              Enable procedural audio
+            </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={audio.autoSelect}
+                onChange={(event) => setAudio((current) => ({ ...current, autoSelect: event.target.checked }))}
+              />
+              Auto-select by scene style
+            </label>
+            <div className="field-row">
+              <label>Audio Preset</label>
+              <select
+                value={audio.preset}
+                disabled={audio.autoSelect}
+                onChange={(event) => setAudio((current) => ({ ...current, preset: event.target.value as AudioSettings['preset'] }))}
+              >
+                {AUDIO_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {activeScene && (
+              <button
+                className="ghost-button full"
+                onClick={() => setAudio((current) => ({ ...current, preset: getSuggestedAudioPreset(activeScene), autoSelect: false }))}
+              >
+                <Sparkles size={18} />
+                Use Best Fit: {getAudioPresetLabel(getSuggestedAudioPreset(activeScene))}
+              </button>
+            )}
+            <button className="ghost-button full" disabled={!audio.enabled} onClick={() => void previewAudioOnce()}>
+              <Play size={18} />
+              Preview Audio
+            </button>
+            <div className="slider-grid">
+              <label>
+                Volume <strong>{Math.round(audio.volume * 100)}%</strong>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={audio.volume}
+                  onChange={(event) => setAudio((current) => ({ ...current, volume: Number(event.target.value) }))}
+                />
+              </label>
+              <label>
+                Intensity <strong>{Math.round(audio.intensity * 100)}%</strong>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1"
+                  step="0.05"
+                  value={audio.intensity}
+                  onChange={(event) => setAudio((current) => ({ ...current, intensity: Number(event.target.value) }))}
+                />
+              </label>
+            </div>
+
+            <div className="panel-divider" />
+            <div className="panel-heading">
+              <FolderOpen size={18} />
+              <span>Project Files</span>
+            </div>
+            <input
+              ref={projectInputRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(event) => void importProjectFile(event.target.files?.[0] ?? null)}
+            />
+            <div className="project-actions">
+              <button className="ghost-button" onClick={exportProjectFile}>
+                <Download size={18} />
+                Export JSON
+              </button>
+              <button className="ghost-button" onClick={() => projectInputRef.current?.click()}>
+                <FolderOpen size={18} />
+                Import JSON
+              </button>
+            </div>
 
             <div className="panel-divider" />
             <div className="panel-heading">
