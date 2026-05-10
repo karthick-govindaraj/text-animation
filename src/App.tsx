@@ -10,12 +10,10 @@ import {
   Layers3,
   Loader2,
   Music2,
-  Palette,
   Pause,
   Play,
   Plus,
   RefreshCw,
-  Save,
   Shield,
   Sparkles,
   Trash2,
@@ -27,8 +25,9 @@ import {
   audioBufferToWav,
   getAudioPresetLabel,
   getSuggestedAudioPreset,
-  playPreviewAudio,
-  renderProjectAudio
+  playPreviewAudioHit,
+  renderProjectAudio,
+  startHowlerPreviewAudio
 } from './audio';
 import {
   AspectRatio,
@@ -46,7 +45,7 @@ import {
   SCENE_TEMPLATES,
   STYLE_PRESETS,
   SafeAreaPreset,
-  TYPOGRAPHY_PRESETS,
+  TextColorMode,
   TextAlign,
   canvasToPng,
   createScene,
@@ -55,6 +54,7 @@ import {
   getAspectSize,
   getFrameCount,
   getTotalDuration,
+  normalizeText,
   renderFrameAsync
 } from './renderer';
 import { exportAlphaWebm, exportMp4 } from './videoExport';
@@ -62,16 +62,17 @@ import { exportAlphaWebm, exportMp4 } from './videoExport';
 type ExportKind = 'mp4' | 'webm-alpha' | 'mov-alpha';
 
 const FF_VERSION = '0.12.10';
-const BRAND_STORAGE_KEY = 'kinetic-text-brand-kit';
 const FONT_STORAGE_KEY = 'kinetic-text-font-controls';
 const PROJECT_FILE_VERSION = 1;
 const IMAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 const VIDEO_LIMIT_BYTES = 25 * 1024 * 1024;
 
+type ProjectSceneV1 = Omit<CaptionScene, 'typographyStyle'>;
+
 type ProjectFileV1 = {
   version: 1;
   createdAt: string;
-  scenes: CaptionScene[];
+  scenes: ProjectSceneV1[];
   aspect: AspectRatio;
   fps: number;
   safeArea: SafeAreaPreset;
@@ -110,6 +111,16 @@ function loadStoredValue<T>(key: string, fallback: T): T {
   }
 }
 
+function serializeSceneForProject(scene: CaptionScene): ProjectSceneV1 {
+  const projectScene = { ...scene } as Partial<CaptionScene>;
+  delete projectScene.typographyStyle;
+  return projectScene as ProjectSceneV1;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
 function makeScenes(templateIndex = 0) {
   return SCENE_TEMPLATES[templateIndex].scenes.map((scene) => createScene(scene));
 }
@@ -121,6 +132,9 @@ export default function App() {
   const startRef = useRef(0);
   const pausedAtRef = useRef(0);
   const stopAudioRef = useRef<(() => void) | null>(null);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceInputRef = useRef<HTMLInputElement | null>(null);
+  const voiceObjectUrlRef = useRef('');
   const projectInputRef = useRef<HTMLInputElement | null>(null);
 
   const [scenes, setScenes] = useState<CaptionScene[]>(() => makeScenes());
@@ -130,9 +144,11 @@ export default function App() {
   const [safeArea, setSafeArea] = useState<SafeAreaPreset>('tiktok');
   const [showGuides, setShowGuides] = useState(true);
   const [font, setFont] = useState<FontControls>(() => loadStoredValue(FONT_STORAGE_KEY, DEFAULT_FONT));
-  const [brand, setBrand] = useState<BrandKit>(() => loadStoredValue(BRAND_STORAGE_KEY, DEFAULT_BRAND));
+  const [brand, setBrand] = useState<BrandKit>(DEFAULT_BRAND);
   const [background, setBackground] = useState<BackgroundSettings>(DEFAULT_BACKGROUND);
   const [audio, setAudio] = useState<AudioSettings>(DEFAULT_AUDIO);
+  const [voicePreviewEnabled, setVoicePreviewEnabled] = useState(false);
+  const [voicePreviewName, setVoicePreviewName] = useState('');
   const [isPlaying, setIsPlaying] = useState(true);
   const [playhead, setPlayhead] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
@@ -163,6 +179,7 @@ export default function App() {
 
   const frameCount = getFrameCount(settings);
   const previewScene = getActiveScene(settings, Math.min(playhead, Math.max(0, duration - 0.01)));
+  const activeSceneWords = useMemo(() => normalizeText(activeScene?.text ?? '').split(' ').filter(Boolean), [activeScene?.text]);
 
   useEffect(() => {
     const firstScene = scenes[0];
@@ -172,14 +189,19 @@ export default function App() {
   }, [activeSceneId, scenes]);
 
   useEffect(() => {
-    localStorage.setItem(BRAND_STORAGE_KEY, JSON.stringify(brand));
-  }, [brand]);
-
-  useEffect(() => {
     localStorage.setItem(FONT_STORAGE_KEY, JSON.stringify(font));
   }, [font]);
 
-  useEffect(() => () => stopAudioPreview(), []);
+  useEffect(
+    () => () => {
+      stopAudioPreview();
+      stopVoicePreview();
+      if (voiceObjectUrlRef.current) {
+        URL.revokeObjectURL(voiceObjectUrlRef.current);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     const canvas = previewRef.current;
@@ -195,6 +217,7 @@ export default function App() {
         const nextTime = duration > 0 ? ((now - startRef.current) / 1000) % duration : 0;
         pausedAtRef.current = nextTime;
         setPlayhead(nextTime);
+        syncVoicePreviewTime(nextTime, false, true);
         void renderFrameAsync(canvas, settings, nextTime, { preview: true, guides: showGuides });
         rafRef.current = requestAnimationFrame(draw);
       } else {
@@ -222,31 +245,79 @@ export default function App() {
 
   useEffect(() => {
     if (isPlaying && audio.enabled) {
-      void startAudioPreview();
+      startAudioPreview();
     } else if (!audio.enabled) {
       stopAudioPreview();
     }
   }, [audio.enabled, audio.preset, audio.autoSelect, audio.volume, audio.intensity]);
+
+  useEffect(() => {
+    if (isPlaying && voicePreviewEnabled) {
+      startVoicePreview();
+    } else if (!voicePreviewEnabled) {
+      stopVoicePreview();
+    }
+  }, [voicePreviewEnabled, voicePreviewName]);
 
   const stopAudioPreview = () => {
     stopAudioRef.current?.();
     stopAudioRef.current = null;
   };
 
-  const startAudioPreview = async () => {
+  const stopVoicePreview = () => {
+    const audioElement = voiceAudioRef.current;
+    if (audioElement) {
+      audioElement.pause();
+    }
+  };
+
+  const startAudioPreview = () => {
     stopAudioPreview();
     if (!settings.audio.enabled) {
       return;
     }
     try {
-      stopAudioRef.current = await playPreviewAudio(settings, pausedAtRef.current);
+      stopAudioRef.current = startHowlerPreviewAudio(settings, () => pausedAtRef.current);
     } catch (cause) {
       console.warn('Audio preview unavailable:', cause);
     }
   };
 
+  const startVoicePreview = () => {
+    const audioElement = voiceAudioRef.current;
+    if (!voicePreviewEnabled || !audioElement || !voicePreviewName) {
+      return;
+    }
+    syncVoicePreviewTime(pausedAtRef.current, true, false);
+    void audioElement.play().catch((cause) => {
+      setError(cause instanceof Error ? cause.message : 'Voice preview playback failed.');
+    });
+  };
+
+  const syncVoicePreviewTime = (time: number, force = false, shouldPlay = isPlaying) => {
+    const audioElement = voiceAudioRef.current;
+    if (!voicePreviewEnabled || !audioElement || !voicePreviewName) {
+      return;
+    }
+
+    const audioDuration = Number.isFinite(audioElement.duration) ? audioElement.duration : 0;
+    const targetTime = audioDuration > 0 ? clampNumber(time, 0, Math.max(0, audioDuration - 0.04)) : Math.max(0, time);
+    if (force || Math.abs(audioElement.currentTime - targetTime) > 0.22) {
+      try {
+        audioElement.currentTime = targetTime;
+      } catch {
+        return;
+      }
+    }
+
+    if (shouldPlay && audioElement.paused && (!audioDuration || targetTime < audioDuration - 0.05)) {
+      void audioElement.play().catch(() => undefined);
+    }
+  };
+
   const pausePreview = () => {
     stopAudioPreview();
+    stopVoicePreview();
     setIsPlaying(false);
   };
 
@@ -256,14 +327,15 @@ export default function App() {
       return;
     }
     startRef.current = 0;
-    void startAudioPreview();
+    startAudioPreview();
+    startVoicePreview();
     setIsPlaying(true);
   };
 
-  const previewAudioOnce = async () => {
+  const previewAudioOnce = () => {
     setError('');
     try {
-      await startAudioPreview();
+      playPreviewAudioHit(settings, pausedAtRef.current);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Audio preview failed.');
     }
@@ -289,12 +361,40 @@ export default function App() {
     updateScene(sceneId, { activeWordCount: next });
   };
 
+  const updateSceneWordColor = (sceneId: string, wordIndex: number, color: string) => {
+    setScenes((current) =>
+      current.map((scene) =>
+        scene.id === sceneId
+          ? {
+              ...scene,
+              wordColors: {
+                ...(scene.wordColors ?? {}),
+                [wordIndex]: color
+              }
+            }
+          : scene
+      )
+    );
+  };
+
+  const resetSceneWordColor = (sceneId: string, wordIndex: number) => {
+    setScenes((current) =>
+      current.map((scene) => {
+        if (scene.id !== sceneId) {
+          return scene;
+        }
+        const nextWordColors = { ...(scene.wordColors ?? {}) };
+        delete nextWordColors[wordIndex];
+        return { ...scene, wordColors: nextWordColors };
+      })
+    );
+  };
+
   const addScene = () => {
     const scene = createScene({
       title: `Scene ${scenes.length + 1}`,
       text: 'Add your next caption beat.',
       animationStyle: activeScene?.animationStyle ?? 'shorts-pop',
-      typographyStyle: activeScene?.typographyStyle ?? 'cinematic',
       accent: activeScene?.accent ?? brand.colors[0],
       duration: 3.5
     });
@@ -345,6 +445,7 @@ export default function App() {
     pausedAtRef.current = next;
     setPlayhead(next);
     pausePreview();
+    syncVoicePreviewTime(next, true, false);
     const canvas = previewRef.current;
     if (canvas) {
       void renderFrameAsync(canvas, settings, next, { preview: true, guides: showGuides });
@@ -508,7 +609,7 @@ export default function App() {
     const project: ProjectFileV1 = {
       version: PROJECT_FILE_VERSION,
       createdAt: new Date().toISOString(),
-      scenes,
+      scenes: scenes.map(serializeSceneForProject),
       aspect,
       fps,
       safeArea,
@@ -580,11 +681,34 @@ export default function App() {
     setError('');
   };
 
-  const updateBrandColor = (index: number, color: string) => {
-    setBrand((current) => ({
-      ...current,
-      colors: current.colors.map((item, itemIndex) => (itemIndex === index ? color : item))
-    }));
+  const readVoicePreviewFile = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+    if (!file.type.includes('mpeg') && !file.name.toLowerCase().endsWith('.mp3')) {
+      setError('Voice sync preview currently supports MP3 files only.');
+      if (voiceInputRef.current) {
+        voiceInputRef.current.value = '';
+      }
+      return;
+    }
+
+    stopVoicePreview();
+    if (voiceObjectUrlRef.current) {
+      URL.revokeObjectURL(voiceObjectUrlRef.current);
+    }
+
+    const url = URL.createObjectURL(file);
+    voiceObjectUrlRef.current = url;
+    const audioElement = new Audio(url);
+    audioElement.preload = 'auto';
+    audioElement.onloadedmetadata = () => syncVoicePreviewTime(pausedAtRef.current, true, false);
+    voiceAudioRef.current = audioElement;
+    setVoicePreviewName(file.name);
+    if (voiceInputRef.current) {
+      voiceInputRef.current.value = '';
+    }
+    setError('');
   };
 
   return (
@@ -642,114 +766,11 @@ export default function App() {
                   <span className="scene-index">{String(index + 1).padStart(2, '0')}</span>
                   <span>
                     <strong>{scene.title}</strong>
-                    <small>
-                      {scene.duration.toFixed(1)}s · {STYLE_PRESETS.find((item) => item.id === scene.animationStyle)?.label} ·{' '}
-                      {TYPOGRAPHY_PRESETS.find((item) => item.id === scene.typographyStyle)?.label}
-                    </small>
+                    <small>{scene.duration.toFixed(1)}s · {STYLE_PRESETS.find((item) => item.id === scene.animationStyle)?.label}</small>
                   </span>
                 </button>
               ))}
             </div>
-
-            <div className="scene-word-controls">
-              <div className="scene-word-controls-title">Animated Words Per Scene</div>
-              {scenes.map((scene, index) => (
-                <label key={`${scene.id}-words`}>
-                  <span>
-                    {String(index + 1).padStart(2, '0')} · {scene.title}
-                  </span>
-                  <strong>{scene.activeWordCount}</strong>
-                  <input
-                    type="range"
-                    min="1"
-                    max="8"
-                    step="1"
-                    value={scene.activeWordCount}
-                    onChange={(event) => updateSceneActiveWordCount(scene.id, Number(event.target.value))}
-                  />
-                </label>
-              ))}
-            </div>
-
-            {activeScene && (
-              <>
-                <div className="field-row">
-                  <label>Scene Title</label>
-                  <input
-                    value={activeScene.title}
-                    onChange={(event) => updateScene(activeScene.id, { title: event.target.value })}
-                  />
-                </div>
-
-                <div className="field-row">
-                  <label>Scene Text</label>
-                  <textarea
-                    value={activeScene.text}
-                    onChange={(event) => updateScene(activeScene.id, { text: event.target.value })}
-                    placeholder="Type this scene caption..."
-                    spellCheck="true"
-                  />
-                </div>
-
-                <div className="compact-actions">
-                  <button className="ghost-button" onClick={() => updateScene(activeScene.id, { duration: estimateDuration(activeScene.text) })}>
-                    <RefreshCw size={16} />
-                    Auto Time
-                  </button>
-                  <button className="ghost-button" onClick={() => duplicateScene(activeScene)}>
-                    <Copy size={16} />
-                    Duplicate
-                  </button>
-                  <button className="ghost-button danger" onClick={() => deleteScene(activeScene.id)} disabled={scenes.length === 1}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-
-                <div className="field-grid">
-                  <label>
-                    Duration
-                    <input
-                      type="number"
-                      min="0.5"
-                      max="300"
-                      step="0.1"
-                      value={activeScene.duration}
-                      onChange={(event) => updateScene(activeScene.id, { duration: Number(event.target.value) })}
-                    />
-                  </label>
-                  <label>
-                    Accent
-                    <input
-                      type="color"
-                      value={activeScene.accent}
-                      onChange={(event) => updateScene(activeScene.id, { accent: event.target.value })}
-                    />
-                  </label>
-                  <label>
-                    Animated Words
-                    <input
-                      type="number"
-                      min="1"
-                      max="8"
-                      step="1"
-                      value={activeScene.activeWordCount}
-                      onChange={(event) => updateSceneActiveWordCount(activeScene.id, Number(event.target.value))}
-                    />
-                  </label>
-                </div>
-                <div className="field-row">
-                  <label>Animated Words at Once: {activeScene.activeWordCount}</label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="8"
-                    step="1"
-                    value={activeScene.activeWordCount}
-                    onChange={(event) => updateSceneActiveWordCount(activeScene.id, Number(event.target.value))}
-                  />
-                </div>
-              </>
-            )}
           </aside>
 
           <section className="preview-stage">
@@ -780,6 +801,136 @@ export default function App() {
 
           <aside className="panel export-panel">
             <div className="panel-heading">
+              <Type size={18} />
+              <span>Scene Controls</span>
+            </div>
+            <div className="scene-word-controls">
+              <div className="scene-word-controls-title">Animated Words Per Scene</div>
+              {scenes.map((scene, index) => (
+                <label key={`${scene.id}-words`}>
+                  <span>
+                    {String(index + 1).padStart(2, '0')} · {scene.title}
+                  </span>
+                  <strong>{scene.activeWordCount}</strong>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    step="1"
+                    value={scene.activeWordCount}
+                    onChange={(event) => updateSceneActiveWordCount(scene.id, Number(event.target.value))}
+                  />
+                </label>
+              ))}
+            </div>
+            {activeScene && (
+              <>
+                <div className="field-row">
+                  <label>Scene Title</label>
+                  <input value={activeScene.title} onChange={(event) => updateScene(activeScene.id, { title: event.target.value })} />
+                </div>
+                <div className="field-row">
+                  <label>Scene Text</label>
+                  <textarea
+                    value={activeScene.text}
+                    onChange={(event) => updateScene(activeScene.id, { text: event.target.value })}
+                    placeholder="Type this scene caption..."
+                    spellCheck="true"
+                  />
+                </div>
+                <div className="field-row">
+                  <label>Per-word Colour</label>
+                  <div className="word-color-grid">
+                    {activeSceneWords.map((word, index) => (
+                      <div className="word-color-row" key={`${activeScene.id}-${word}-${index}`}>
+                        <span title={word}>{word}</span>
+                        <input
+                          type="color"
+                          value={activeScene.wordColors?.[index] ?? font.textColor}
+                          onChange={(event) => updateSceneWordColor(activeScene.id, index, event.target.value)}
+                          title={`Set colour for ${word}`}
+                        />
+                        <button
+                          className="mini-button"
+                          type="button"
+                          onClick={() => resetSceneWordColor(activeScene.id, index)}
+                          disabled={!activeScene.wordColors?.[index]}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="compact-actions">
+                  <button className="ghost-button" onClick={() => updateScene(activeScene.id, { duration: estimateDuration(activeScene.text) })}>
+                    <RefreshCw size={16} />
+                    Auto Time
+                  </button>
+                  <button className="ghost-button" onClick={() => duplicateScene(activeScene)}>
+                    <Copy size={16} />
+                    Duplicate
+                  </button>
+                  <button className="ghost-button danger" onClick={() => deleteScene(activeScene.id)} disabled={scenes.length === 1}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="field-grid">
+                  <label>
+                    Duration
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="300"
+                      step="0.1"
+                      value={activeScene.duration}
+                      onChange={(event) => updateScene(activeScene.id, { duration: Number(event.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    Accent
+                    <input type="color" value={activeScene.accent} onChange={(event) => updateScene(activeScene.id, { accent: event.target.value })} />
+                  </label>
+                  <label>
+                    Animated Words
+                    <input
+                      type="number"
+                      min="1"
+                      max="8"
+                      step="1"
+                      value={activeScene.activeWordCount}
+                      onChange={(event) => updateSceneActiveWordCount(activeScene.id, Number(event.target.value))}
+                    />
+                  </label>
+                </div>
+                <div className="slider-grid">
+                  <label>
+                    X Offset <strong>{activeScene.offsetX ?? 0}%</strong>
+                    <input
+                      type="range"
+                      min="-50"
+                      max="50"
+                      step="1"
+                      value={activeScene.offsetX ?? 0}
+                      onChange={(event) => updateScene(activeScene.id, { offsetX: Number(event.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    Y Offset <strong>{activeScene.offsetY ?? 0}%</strong>
+                    <input
+                      type="range"
+                      min="-50"
+                      max="50"
+                      step="1"
+                      value={activeScene.offsetY ?? 0}
+                      onChange={(event) => updateScene(activeScene.id, { offsetY: Number(event.target.value) })}
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+            <div className="panel-divider" />
+            <div className="panel-heading">
               <Wand2 size={18} />
               <span>Animation Presets</span>
             </div>
@@ -789,30 +940,6 @@ export default function App() {
                   key={item.id}
                   className={activeScene?.animationStyle === item.id ? 'style-card active' : 'style-card'}
                   onClick={() => activeScene && updateScene(activeScene.id, { animationStyle: item.id })}
-                >
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="panel-divider" />
-            <div className="panel-heading">
-              <Sparkles size={18} />
-              <span>Typography Styles</span>
-            </div>
-            {activeScene && (
-              <div className="current-pair">
-                <span>Animation: {STYLE_PRESETS.find((item) => item.id === activeScene.animationStyle)?.label}</span>
-                <span>Typography: {TYPOGRAPHY_PRESETS.find((item) => item.id === activeScene.typographyStyle)?.label}</span>
-              </div>
-            )}
-            <div className="style-list preset-list typography-list">
-              {TYPOGRAPHY_PRESETS.map((item) => (
-                <button
-                  key={item.id}
-                  className={activeScene?.typographyStyle === item.id ? 'style-card active' : 'style-card'}
-                  onClick={() => activeScene && updateScene(activeScene.id, { typographyStyle: item.id })}
                 >
                   <strong>{item.label}</strong>
                   <span>{item.description}</span>
@@ -842,6 +969,70 @@ export default function App() {
                 ))}
               </select>
             </div>
+
+            <div className="field-row">
+              <label>Text Colour</label>
+              <div className="segmented">
+                {(['solid', 'gradient'] as TextColorMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    className={font.textColorMode === mode ? 'active' : ''}
+                    onClick={() => setFont((current) => ({ ...current, textColorMode: mode }))}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {font.textColorMode === 'solid' ? (
+              <div className="field-row">
+                <label>Solid Text</label>
+                <input
+                  type="color"
+                  value={font.textColor}
+                  onChange={(event) => setFont((current) => ({ ...current, textColor: event.target.value }))}
+                />
+              </div>
+            ) : (
+              <div className="field-grid">
+                <label>
+                  From
+                  <input
+                    type="color"
+                    value={font.gradientFrom}
+                    onChange={(event) => setFont((current) => ({ ...current, gradientFrom: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Middle
+                  <input
+                    type="color"
+                    value={font.gradientMid}
+                    onChange={(event) => setFont((current) => ({ ...current, gradientMid: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  To
+                  <input
+                    type="color"
+                    value={font.gradientTo}
+                    onChange={(event) => setFont((current) => ({ ...current, gradientTo: event.target.value }))}
+                  />
+                </label>
+                <label className="wide">
+                  Direction <strong>{font.gradientDirection}°</strong>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="15"
+                    value={font.gradientDirection}
+                    onChange={(event) => setFont((current) => ({ ...current, gradientDirection: Number(event.target.value) }))}
+                  />
+                </label>
+              </div>
+            )}
 
             <div className="slider-grid">
               <label>
@@ -1098,40 +1289,6 @@ export default function App() {
 
             <div className="panel-divider" />
             <div className="panel-heading">
-              <Palette size={18} />
-              <span>Brand Kit</span>
-            </div>
-            <div className="brand-colors">
-              {brand.colors.map((color, index) => (
-                <input key={`${color}-${index}`} type="color" value={color} onChange={(event) => updateBrandColor(index, event.target.value)} />
-              ))}
-            </div>
-            <div className="compact-actions">
-              {brand.colors.map((color, index) => (
-                <button
-                  key={`${color}-apply-${index}`}
-                  className="swatch-button"
-                  style={{ backgroundColor: color }}
-                  onClick={() => activeScene && updateScene(activeScene.id, { accent: color })}
-                  title="Apply brand color"
-                />
-              ))}
-            </div>
-            <div className="field-row">
-              <label>Watermark</label>
-              <input value={brand.watermark} onChange={(event) => setBrand((current) => ({ ...current, watermark: event.target.value }))} />
-            </div>
-            <label className="toggle-row">
-              <input
-                type="checkbox"
-                checked={brand.watermarkEnabled}
-                onChange={(event) => setBrand((current) => ({ ...current, watermarkEnabled: event.target.checked }))}
-              />
-              Render watermark
-            </label>
-
-            <div className="panel-divider" />
-            <div className="panel-heading">
               <Music2 size={18} />
               <span>Audio Motion</span>
             </div>
@@ -1146,8 +1303,34 @@ export default function App() {
                   }
                 }}
               />
-              Enable procedural audio
+              Enable audio effects
             </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={voicePreviewEnabled}
+                disabled={!voicePreviewName}
+                onChange={(event) => {
+                  setVoicePreviewEnabled(event.target.checked);
+                  if (!event.target.checked) {
+                    stopVoicePreview();
+                  }
+                }}
+              />
+              Voice sync preview
+            </label>
+            <input
+              ref={voiceInputRef}
+              className="hidden-input"
+              type="file"
+              accept="audio/mpeg,.mp3"
+              onChange={(event) => readVoicePreviewFile(event.target.files?.[0] ?? null)}
+            />
+            <button className="ghost-button full" onClick={() => voiceInputRef.current?.click()}>
+              <Music2 size={18} />
+              {voicePreviewName ? 'Change Voice MP3' : 'Import Voice MP3'}
+            </button>
+            {voicePreviewName && <p className="format-note voice-file-name">{voicePreviewName}</p>}
             <label className="toggle-row">
               <input
                 type="checkbox"
@@ -1179,7 +1362,7 @@ export default function App() {
                 Use Best Fit: {getAudioPresetLabel(getSuggestedAudioPreset(activeScene))}
               </button>
             )}
-            <button className="ghost-button full" disabled={!audio.enabled} onClick={() => void previewAudioOnce()}>
+            <button className="ghost-button full" disabled={!audio.enabled} onClick={previewAudioOnce}>
               <Play size={18} />
               Preview Audio
             </button>
@@ -1269,17 +1452,6 @@ export default function App() {
               <Sparkles size={18} />
               Alpha MOV
             </button>
-            <button
-              className="ghost-button full"
-              onClick={() => {
-                localStorage.setItem(BRAND_STORAGE_KEY, JSON.stringify(brand));
-                localStorage.setItem(FONT_STORAGE_KEY, JSON.stringify(font));
-              }}
-            >
-              <Save size={18} />
-              Save Brand Preset
-            </button>
-
             {isExporting && (
               <div className="progress-card">
                 <div className="progress-title">

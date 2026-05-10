@@ -1,3 +1,4 @@
+import { Howl } from 'howler';
 import {
   AudioPresetId,
   AudioSettings,
@@ -42,7 +43,33 @@ export const AUDIO_PRESETS: { id: AudioPresetId; label: string; kind: 'effect' |
   { id: 'vocal-chop-beat', label: 'Vocal Chop Beat', kind: 'beat' }
 ];
 
+export type EncodedAudioCodec = 'aac' | 'opus';
 type AudioChunkCallback = (chunk: EncodedAudioChunk, meta?: EncodedAudioChunkMetadata) => void;
+type SoundKey =
+  | 'bassDrop'
+  | 'bassHit'
+  | 'cinematicBoom1'
+  | 'cinematicBoom2'
+  | 'glitch'
+  | 'impactHit1'
+  | 'impactHit2'
+  | 'impactHit3'
+  | 'reverseCymbal'
+  | 'subDrop'
+  | 'tick'
+  | 'typewriter'
+  | 'uiClick1'
+  | 'uiClick2'
+  | 'uiClick3'
+  | 'whoosh1'
+  | 'whoosh2'
+  | 'whoosh3';
+
+type PreviewAudioEvent = {
+  time: number;
+  preset: AudioPresetId;
+  index: number;
+};
 
 const beatPresets = new Set<AudioPresetId>([
   'pulse-bass',
@@ -61,12 +88,194 @@ const beatPresets = new Set<AudioPresetId>([
 
 const ambiencePresets = new Set<AudioPresetId>(['cyberpunk-ambience', 'neon-hum-ambience']);
 
+const SOUND_URLS: Record<SoundKey, string> = {
+  bassDrop: new URL('../sound-effects/Bass-Drop.mp3', import.meta.url).href,
+  bassHit: new URL('../sound-effects/Bass-Hit.mp3', import.meta.url).href,
+  cinematicBoom1: new URL('../sound-effects/Cinematic-Boom-1.mp3', import.meta.url).href,
+  cinematicBoom2: new URL('../sound-effects/Cinematic-Boom-2.mp3', import.meta.url).href,
+  glitch: new URL('../sound-effects/Glitch.mp3', import.meta.url).href,
+  impactHit1: new URL('../sound-effects/Impact-Hit-1.mp3', import.meta.url).href,
+  impactHit2: new URL('../sound-effects/Impact-Hit-2.mp3', import.meta.url).href,
+  impactHit3: new URL('../sound-effects/Impact-Hit-3.mp3', import.meta.url).href,
+  reverseCymbal: new URL('../sound-effects/Reverse-Cymbal.mp3', import.meta.url).href,
+  subDrop: new URL('../sound-effects/Sub-Drop.mp3', import.meta.url).href,
+  tick: new URL('../sound-effects/Tick.mp3', import.meta.url).href,
+  typewriter: new URL('../sound-effects/Typewriter.mp3', import.meta.url).href,
+  uiClick1: new URL('../sound-effects/UI-Click-1.mp3', import.meta.url).href,
+  uiClick2: new URL('../sound-effects/UI-Click-2.mp3', import.meta.url).href,
+  uiClick3: new URL('../sound-effects/UI-Click-3.mp3', import.meta.url).href,
+  whoosh1: new URL('../sound-effects/Whoosh-1.mp3', import.meta.url).href,
+  whoosh2: new URL('../sound-effects/Whoosh-2.mp3', import.meta.url).href,
+  whoosh3: new URL('../sound-effects/Whoosh-3.mp3', import.meta.url).href
+};
+
+const PRESET_SOUNDS: Record<AudioPresetId, SoundKey[]> = {
+  'cinematic-boom': ['cinematicBoom1', 'cinematicBoom2'],
+  'bass-hit': ['bassHit'],
+  whoosh: ['whoosh1', 'whoosh2', 'whoosh3'],
+  'impact-hit': ['impactHit1', 'impactHit2', 'impactHit3'],
+  'glitch-fx': ['glitch'],
+  'rise-sweep': ['whoosh2', 'reverseCymbal'],
+  'sub-drop': ['subDrop', 'bassDrop'],
+  'tick-clock-fx': ['tick'],
+  'reverse-cymbal': ['reverseCymbal'],
+  'trailer-braam': ['cinematicBoom2', 'subDrop'],
+  'ui-click-sounds': ['uiClick1', 'uiClick2', 'uiClick3'],
+  'typewriter-fx': ['typewriter'],
+  'echo-hit': ['impactHit2', 'whoosh1'],
+  'pulse-bass': ['bassHit', 'tick'],
+  'trap-beat': ['bassHit', 'uiClick1', 'uiClick2'],
+  'phonk-beat': ['bassDrop', 'bassHit'],
+  'synthwave-beat': ['bassHit', 'whoosh3'],
+  'cyberpunk-ambience': ['glitch', 'uiClick3'],
+  'epic-trailer-music': ['cinematicBoom1', 'impactHit3'],
+  'lo-fi-beat': ['tick', 'uiClick2'],
+  'glitch-bass': ['glitch', 'bassDrop'],
+  'percussion-hits': ['impactHit1', 'uiClick1'],
+  'stomp-beat': ['impactHit3', 'bassHit'],
+  'hybrid-orchestral-beat': ['cinematicBoom1', 'impactHit2'],
+  'edm-build-up': ['reverseCymbal', 'whoosh2'],
+  'heartbeat-fx': ['bassHit'],
+  'vinyl-scratch': ['glitch', 'whoosh1'],
+  'digital-beep-fx': ['uiClick2', 'uiClick3'],
+  'neon-hum-ambience': ['whoosh3', 'uiClick3'],
+  'vocal-chop-beat': ['uiClick1', 'glitch']
+};
+
+const previewHowls = new Map<SoundKey, Howl>();
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
 function safeAudio(settings: RenderSettings): AudioSettings {
   return { ...DEFAULT_AUDIO, ...(settings.audio ?? {}) };
+}
+
+function getPreviewHowl(soundKey: SoundKey) {
+  let howl = previewHowls.get(soundKey);
+  if (!howl) {
+    howl = new Howl({
+      src: [SOUND_URLS[soundKey]],
+      html5: false,
+      preload: true
+    });
+    previewHowls.set(soundKey, howl);
+  }
+  return howl;
+}
+
+function pickSound(preset: AudioPresetId, index: number) {
+  const sounds = PRESET_SOUNDS[preset] ?? PRESET_SOUNDS.whoosh;
+  return sounds[index % sounds.length];
+}
+
+function playPresetSound(preset: AudioPresetId, audio: AudioSettings, index: number) {
+  const howl = getPreviewHowl(pickSound(preset, index));
+  const id = howl.play();
+  const volume = clamp(audio.volume * (0.45 + audio.intensity * 0.65), 0, 1);
+  howl.volume(volume, id);
+  if (preset === 'tick-clock-fx' || preset === 'typewriter-fx' || preset === 'ui-click-sounds') {
+    howl.rate(0.92 + (index % 5) * 0.04, id);
+  } else if (preset === 'glitch-fx' || preset === 'glitch-bass') {
+    howl.rate(0.9 + (index % 4) * 0.08, id);
+  } else {
+    howl.rate(1, id);
+  }
+}
+
+function stopPreviewSounds() {
+  previewHowls.forEach((howl) => howl.stop());
+}
+
+function buildPreviewAudioEvents(settings: RenderSettings) {
+  const audio = safeAudio(settings);
+  const events: PreviewAudioEvent[] = [];
+  let cursor = 0;
+
+  settings.scenes.forEach((scene) => {
+    const words = normalizeText(scene.text).split(' ').filter(Boolean);
+    const preset = audio.autoSelect ? getSuggestedAudioPreset(scene) : audio.preset;
+    const activeWordCount = clamp(Math.round(scene.activeWordCount || 1), 1, 8);
+
+    if (words.length > 0) {
+      const readableDuration = Math.max(0.6, scene.duration * 0.84);
+      const step = readableDuration / Math.max(1, words.length);
+      const groupCount = Math.ceil(words.length / activeWordCount);
+
+      for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+        const eventTime = Math.min(
+          cursor + scene.duration - 0.04,
+          cursor + 0.16 + groupIndex * step * activeWordCount
+        );
+        events.push({ time: eventTime, preset, index: events.length });
+      }
+    } else {
+      events.push({ time: cursor, preset, index: events.length });
+    }
+
+    cursor += scene.duration;
+  });
+
+  return events.sort((a, b) => a.time - b.time);
+}
+
+export function playPreviewAudioHit(settings: RenderSettings, atTime = 0) {
+  const audio = safeAudio(settings);
+  if (!audio.enabled || settings.duration <= 0) {
+    return;
+  }
+
+  const events = buildPreviewAudioEvents(settings);
+  const time = clamp(atTime, 0, Math.max(0, settings.duration - 0.001));
+  const event = events.find((item) => item.time >= time) ?? events[0];
+  if (event) {
+    playPresetSound(event.preset, audio, event.index);
+  }
+}
+
+export function startHowlerPreviewAudio(settings: RenderSettings, getTime: () => number) {
+  const audio = safeAudio(settings);
+  if (!audio.enabled || settings.duration <= 0) {
+    return () => undefined;
+  }
+
+  const events = buildPreviewAudioEvents(settings);
+  let frameId = 0;
+  let lastTime = clamp(getTime(), 0, Math.max(0, settings.duration - 0.001));
+  let loopIndex = 0;
+  const played = new Set<string>();
+
+  const playRange = (from: number, to: number) => {
+    events.forEach((event) => {
+      const key = `${loopIndex}:${event.index}`;
+      if (!played.has(key) && event.time > from && event.time <= to) {
+        played.add(key);
+        playPresetSound(event.preset, audio, event.index);
+      }
+    });
+  };
+
+  const tick = () => {
+    const currentTime = clamp(getTime(), 0, Math.max(0, settings.duration - 0.001));
+    if (currentTime + 0.08 < lastTime) {
+      playRange(lastTime, settings.duration);
+      loopIndex += 1;
+      played.clear();
+      playRange(0, currentTime);
+    } else {
+      playRange(lastTime, currentTime);
+    }
+    lastTime = currentTime;
+    frameId = requestAnimationFrame(tick);
+  };
+
+  frameId = requestAnimationFrame(tick);
+
+  return () => {
+    cancelAnimationFrame(frameId);
+    stopPreviewSounds();
+  };
 }
 
 export function getAudioPresetLabel(id: AudioPresetId) {
@@ -226,6 +435,90 @@ function scheduleEffect(
   }
 }
 
+function scheduleWordAccent(
+  ctx: BaseAudioContext,
+  destination: AudioNode,
+  preset: AudioPresetId,
+  start: number,
+  volume: number,
+  intensity: number,
+  index: number
+) {
+  const g = volume * (0.18 + intensity * 0.34);
+  switch (preset) {
+    case 'typewriter-fx':
+    case 'ui-click-sounds':
+    case 'digital-beep-fx':
+      addClick(ctx, destination, start, g * 0.8, 1200 + (index % 5) * 260);
+      break;
+    case 'glitch-fx':
+    case 'glitch-bass':
+      addClick(ctx, destination, start, g * 0.58, 700 + (index % 6) * 520);
+      addNoise(ctx, destination, start, 0.045, g * 0.18, 'bandpass', 1800 + (index % 4) * 640);
+      break;
+    case 'stomp-beat':
+    case 'impact-hit':
+      addTone(ctx, destination, start, 0.13, 118, 56, g * 0.78, 'sine');
+      addNoise(ctx, destination, start, 0.055, g * 0.2, 'lowpass', 760);
+      break;
+    case 'cinematic-boom':
+    case 'trailer-braam':
+      addTone(ctx, destination, start, 0.18, 150, 68, g * 0.45, 'triangle');
+      break;
+    case 'sub-drop':
+    case 'bass-hit':
+    case 'pulse-bass':
+      addTone(ctx, destination, start, 0.16, 112, 48, g * 0.68, 'sine');
+      break;
+    case 'neon-hum-ambience':
+    case 'cyberpunk-ambience':
+      addTone(ctx, destination, start, 0.09, 880 + (index % 3) * 140, 520, g * 0.28, 'sine');
+      break;
+    case 'tick-clock-fx':
+      addClick(ctx, destination, start, g * 0.62, 1700);
+      break;
+    case 'whoosh':
+    case 'rise-sweep':
+    case 'reverse-cymbal':
+      addNoise(ctx, destination, start, 0.12, g * 0.14, 'highpass', 1600);
+      addTone(ctx, destination, start, 0.11, 320, 860, g * 0.12, 'sawtooth');
+      break;
+    case 'vinyl-scratch':
+      addNoise(ctx, destination, start, 0.075, g * 0.18, 'bandpass', 1900);
+      break;
+    default:
+      addClick(ctx, destination, start, g * 0.42, 1100 + (index % 4) * 180);
+      addTone(ctx, destination, start, 0.08, 260 + (index % 5) * 50, 130, g * 0.2, 'triangle');
+      break;
+  }
+}
+
+function scheduleWordAccents(
+  ctx: BaseAudioContext,
+  destination: AudioNode,
+  scene: CaptionScene,
+  preset: AudioPresetId,
+  sceneStart: number,
+  volume: number,
+  intensity: number
+) {
+  const words = normalizeText(scene.text).split(' ').filter(Boolean);
+  if (words.length === 0) {
+    return;
+  }
+
+  const readableDuration = Math.max(0.6, scene.duration * 0.84);
+  const step = readableDuration / Math.max(1, words.length);
+  const activeWordCount = clamp(Math.round(scene.activeWordCount || 1), 1, 8);
+  words.forEach((_, index) => {
+    const groupIndex = Math.floor(index / activeWordCount);
+    const groupStart = sceneStart + 0.16 + groupIndex * step * activeWordCount;
+    const groupedOffset = (index % activeWordCount) * Math.min(0.055, step * 0.32);
+    const wordTime = Math.min(sceneStart + scene.duration - 0.06, groupStart + groupedOffset);
+    scheduleWordAccent(ctx, destination, preset, wordTime, volume, intensity, index);
+  });
+}
+
 function scheduleBeat(ctx: BaseAudioContext, destination: AudioNode, preset: AudioPresetId, start: number, end: number, volume: number, intensity: number) {
   const bpm =
     preset === 'trap-beat' || preset === 'edm-build-up'
@@ -284,7 +577,7 @@ export async function renderProjectAudio(settings: RenderSettings) {
   const frameCount = Math.ceil(settings.duration * sampleRate);
   const offline = new OfflineAudioContext(2, frameCount, sampleRate);
   const master = offline.createGain();
-  master.gain.value = clamp(audio.volume, 0, 1);
+  master.gain.value = 1;
   master.connect(offline.destination);
 
   let cursor = 0;
@@ -298,46 +591,11 @@ export async function renderProjectAudio(settings: RenderSettings) {
     } else {
       scheduleEffect(offline, master, preset, cursor, audio.volume, audio.intensity);
     }
-
-    const words = normalizeText(scene.text).split(' ').filter(Boolean);
-    const step = Math.max(0.12, (scene.duration * 0.84) / Math.max(1, words.length));
-    if (preset === 'typewriter-fx' || preset === 'ui-click-sounds' || preset === 'digital-beep-fx') {
-      words.forEach((_, index) => scheduleEffect(offline, master, preset, cursor + 0.16 + index * step, audio.volume * 0.75, audio.intensity));
-    }
+    scheduleWordAccents(offline, master, scene, preset, cursor, audio.volume, audio.intensity);
     cursor = sceneEnd;
   }
 
   return offline.startRendering();
-}
-
-export async function playPreviewAudio(settings: RenderSettings, startAt: number) {
-  const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextConstructor) {
-    return () => undefined;
-  }
-
-  const context = new AudioContextConstructor({ sampleRate: AUDIO_SAMPLE_RATE });
-  await context.resume().catch(() => undefined);
-  const buffer = await renderProjectAudio(settings);
-  if (!buffer) {
-    context.close().catch(() => undefined);
-    return () => undefined;
-  }
-
-  const source = context.createBufferSource();
-  const gain = context.createGain();
-  source.buffer = buffer;
-  gain.gain.value = 1;
-  source.connect(gain).connect(context.destination);
-  source.start(0, clamp(startAt, 0, Math.max(0, buffer.duration - 0.01)));
-  return () => {
-    try {
-      source.stop();
-    } catch {
-      // Already stopped.
-    }
-    context.close().catch(() => undefined);
-  };
 }
 
 export function audioBufferToWav(buffer: AudioBuffer) {
@@ -409,7 +667,7 @@ async function getAudioEncoderConfig(codec: string, buffer: AudioBuffer): Promis
 
 export async function encodeAudioBuffer(
   buffer: AudioBuffer,
-  codec: 'aac' | 'opus',
+  codec: EncodedAudioCodec,
   onChunk: AudioChunkCallback
 ) {
   const encoderConfig = await getAudioEncoderConfig(codec === 'aac' ? 'mp4a.40.2' : 'opus', buffer);

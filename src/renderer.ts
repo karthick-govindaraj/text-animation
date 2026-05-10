@@ -49,6 +49,7 @@ export type SafeAreaPreset = 'none' | 'tiktok' | 'reels' | 'shorts';
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 export type BackgroundMode = 'transparent' | 'solid' | 'gradient' | 'image' | 'video';
 export type BackgroundFit = 'cover' | 'contain' | 'stretch';
+export type TextColorMode = 'solid' | 'gradient';
 export type AudioPresetId =
   | 'cinematic-boom'
   | 'bass-hit'
@@ -90,6 +91,9 @@ export type CaptionScene = {
   accent: string;
   duration: number;
   activeWordCount: number;
+  wordColors: Record<number, string>;
+  offsetX: number;
+  offsetY: number;
 };
 
 export type FontControls = {
@@ -105,6 +109,12 @@ export type FontControls = {
   maxWordsPerLine: number;
   position: CaptionPosition;
   textAlign: TextAlign;
+  textColorMode: TextColorMode;
+  textColor: string;
+  gradientFrom: string;
+  gradientMid: string;
+  gradientTo: string;
+  gradientDirection: number;
 };
 
 export type BrandKit = {
@@ -160,6 +170,7 @@ type WordToken = {
   emphasis: number;
   active: boolean;
   justifyGap: number;
+  color?: string;
 };
 
 type ActiveScene = {
@@ -190,7 +201,13 @@ export const DEFAULT_FONT: FontControls = {
   highlightShape: 'pill',
   maxWordsPerLine: 4,
   position: 'center',
-  textAlign: 'center'
+  textAlign: 'center',
+  textColorMode: 'solid',
+  textColor: '#F4F2EA',
+  gradientFrom: '#FFFFFF',
+  gradientMid: '#FFD60A',
+  gradientTo: '#FFD60A',
+  gradientDirection: 0
 };
 
 export const DEFAULT_BRAND: BrandKit = {
@@ -221,21 +238,30 @@ export const DEFAULT_AUDIO: AudioSettings = {
 };
 
 export const FONT_FAMILIES: { label: string; family: string; weight: number }[] = [
+  { label: 'Sans-serif (System)', family: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', weight: 800 },
   { label: 'Bebas Neue', family: 'Bebas Neue, Impact, sans-serif', weight: 400 },
   { label: 'Anton', family: 'Anton, Impact, sans-serif', weight: 400 },
   { label: 'Montserrat', family: 'Montserrat, Arial, sans-serif', weight: 800 },
   { label: 'Poppins', family: 'Poppins, Arial, sans-serif', weight: 800 },
+  { label: 'DM Sans', family: 'DM Sans, Arial, sans-serif', weight: 800 },
+  { label: 'Manrope', family: 'Manrope, Arial, sans-serif', weight: 800 },
+  { label: 'Sora', family: 'Sora, Arial, sans-serif', weight: 800 },
+  { label: 'Space Grotesk', family: 'Space Grotesk, Arial, sans-serif', weight: 800 },
   { label: 'Oswald', family: 'Oswald, Arial Narrow, sans-serif', weight: 700 },
   { label: 'League Spartan', family: 'League Spartan, Arial, sans-serif', weight: 800 },
   { label: 'Orbitron', family: 'Orbitron, ui-monospace, monospace', weight: 800 },
-  { label: 'Exo 2', family: 'Exo 2, Arial, sans-serif', weight: 800 },
   { label: 'Cinzel', family: 'Cinzel, Georgia, serif', weight: 700 },
+  { label: 'Playfair Display', family: 'Playfair Display, Georgia, serif', weight: 800 },
+  { label: 'Monsieur La Doulaise', family: 'Monsieur La Doulaise, cursive', weight: 400 },
   { label: 'Barlow Condensed', family: 'Barlow Condensed, Arial Narrow, sans-serif', weight: 800 },
   { label: 'Teko', family: 'Teko, Arial Narrow, sans-serif', weight: 700 },
   { label: 'Rajdhani', family: 'Rajdhani, Arial, sans-serif', weight: 700 },
   { label: 'Audiowide', family: 'Audiowide, ui-monospace, monospace', weight: 400 },
   { label: 'Archivo Black', family: 'Archivo Black, Arial Black, sans-serif', weight: 400 },
-  { label: 'Russo One', family: 'Russo One, Arial Black, sans-serif', weight: 400 }
+  { label: 'Russo One', family: 'Russo One, Arial Black, sans-serif', weight: 400 },
+  { label: 'Bungee', family: 'Bungee, Arial Black, sans-serif', weight: 400 },
+  { label: 'Righteous', family: 'Righteous, Arial Black, sans-serif', weight: 400 },
+  { label: 'Permanent Marker', family: 'Permanent Marker, cursive', weight: 400 }
 ];
 
 export const STYLE_PRESETS: { id: AnimationStyle; label: string; description: string }[] = [
@@ -261,30 +287,7 @@ export const STYLE_PRESETS: { id: AnimationStyle; label: string; description: st
   { id: 'drift', label: 'Drift', description: 'Smooth floating motion for calm edits.' }
 ];
 
-export const TYPOGRAPHY_PRESETS: { id: TypographyStyle; label: string; description: string }[] = [
-  { id: 'motion', label: 'Motion Typography', description: 'Directional streaks and dynamic movement accents.' },
-  { id: 'animated', label: 'Animated Typography', description: 'Fade, zoom, rotate, and slide visual treatment.' },
-  { id: 'fluid', label: 'Fluid Typography', description: 'Wave distortion and elastic flow.' },
-  { id: 'three-d', label: '3D Typography', description: 'Layered shadow depth and perspective skew.' },
-  { id: 'particle', label: 'Particle Typography', description: 'Dotted text fill and particle sparkle simulation.' },
-  { id: 'glitch-typography', label: 'Glitch Typography', description: 'RGB split, jitter, and digital noise.' },
-  { id: 'mask-reveal', label: 'Mask Reveal Typography', description: 'Wipe and clipping reveal treatment.' },
-  { id: 'handwritten', label: 'Handwritten Typography', description: 'Progressive draw-style reveal.' },
-  { id: 'bounce-typography', label: 'Bounce Typography', description: 'Rounded elastic visual treatment.' },
-  { id: 'cinematic', label: 'Cinematic Typography', description: 'Dramatic scale, depth, and strong shadow.' },
-  { id: 'minimal', label: 'Minimal Typography', description: 'Clean flat type with subtle opacity.' },
-  { id: 'sync', label: 'Sync Typography', description: 'Time-based beat pulse emphasis.' },
-  { id: 'morph', label: 'Morph Typography', description: 'Crossfade and scale morph approximation.' },
-  { id: 'neon', label: 'Neon Typography', description: 'Glow and flicker treatment.' },
-  { id: 'liquid', label: 'Liquid Typography', description: 'Drip and water-like offsets.' },
-  { id: 'retro', label: 'Retro Typography', description: 'Arcade colors and scanline accents.' },
-  { id: 'ui-tech', label: 'UI / Tech Typography', description: 'HUD brackets and futuristic interface accents.' },
-  { id: 'explosive', label: 'Explosive Typography', description: 'Burst lines, sparks, and impact styling.' },
-  { id: 'scroll-based', label: 'Scroll-Based Typography', description: 'Scroll-style visual flow inside the video.' },
-  { id: 'ai-cyberpunk', label: 'AI / Cyberpunk Typography', description: 'Holographic magenta/cyan cyber styling.' }
-];
-
-export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionScene, 'id' | 'activeWordCount'>[] }[] = [
+export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionScene, 'id' | 'activeWordCount' | 'wordColors' | 'offsetX' | 'offsetY'>[] }[] = [
   {
     id: 'viral-explainer',
     label: 'Hook - Problem - Solution - CTA',
@@ -293,7 +296,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Hook',
         text: 'Stop scrolling.',
         animationStyle: 'tiktok-bounce',
-        typographyStyle: 'cinematic',
+        typographyStyle: 'three-d',
         accent: '#FF3B30',
         duration: 2.2
       },
@@ -301,7 +304,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Problem',
         text: 'Most captions fail because they move too slowly.',
         animationStyle: 'caption-stack',
-        typographyStyle: 'motion',
+        typographyStyle: 'three-d',
         accent: '#FFD60A',
         duration: 5
       },
@@ -309,7 +312,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Solution',
         text: 'Use short beats and highlight one idea at a time.',
         animationStyle: 'karaoke',
-        typographyStyle: 'sync',
+        typographyStyle: 'three-d',
         accent: '#64D2FF',
         duration: 5.5
       },
@@ -317,7 +320,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'CTA',
         text: 'Export it with a transparent background.',
         animationStyle: 'word-zoom',
-        typographyStyle: 'neon',
+        typographyStyle: 'three-d',
         accent: '#32D74B',
         duration: 3.5
       }
@@ -331,7 +334,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Breaking',
         text: 'Breaking update',
         animationStyle: 'stomp',
-        typographyStyle: 'explosive',
+        typographyStyle: 'three-d',
         accent: '#FF3B30',
         duration: 2
       },
@@ -339,7 +342,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Detail',
         text: 'Here is the detail your audience needs to know.',
         animationStyle: 'news-ticker',
-        typographyStyle: 'retro',
+        typographyStyle: 'three-d',
         accent: '#FFD60A',
         duration: 6
       },
@@ -347,7 +350,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Takeaway',
         text: 'The important part is what changes next.',
         animationStyle: 'clean-subtitle',
-        typographyStyle: 'minimal',
+        typographyStyle: 'three-d',
         accent: '#64D2FF',
         duration: 4
       }
@@ -369,7 +372,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Feature',
         text: 'Build animated captions scene by scene.',
         animationStyle: 'tech-hud',
-        typographyStyle: 'ui-tech',
+        typographyStyle: 'three-d',
         accent: '#64D2FF',
         duration: 5
       },
@@ -377,7 +380,7 @@ export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionS
         title: 'Proof',
         text: 'Preview in real time and export in HD.',
         animationStyle: 'shorts-pop',
-        typographyStyle: 'ai-cyberpunk',
+        typographyStyle: 'three-d',
         accent: '#32D74B',
         duration: 4
       }
@@ -423,10 +426,13 @@ export function createScene(partial: Partial<CaptionScene> = {}): CaptionScene {
     title: partial.title ?? 'Scene',
     text: partial.text ?? DEFAULT_TEXT,
     animationStyle: partial.animationStyle ?? 'tiktok-bounce',
-    typographyStyle: partial.typographyStyle ?? 'cinematic',
+    typographyStyle: 'three-d',
     accent: partial.accent ?? '#FF3B30',
     duration: partial.duration ?? estimateDuration(partial.text ?? DEFAULT_TEXT),
-    activeWordCount: clamp(Math.round(partial.activeWordCount ?? 1), 1, 8)
+    activeWordCount: clamp(Math.round(partial.activeWordCount ?? 1), 1, 8),
+    wordColors: partial.wordColors ?? {},
+    offsetX: clamp(Number(partial.offsetX ?? 0), -50, 50),
+    offsetY: clamp(Number(partial.offsetY ?? 0), -50, 50)
   };
 }
 
@@ -523,7 +529,9 @@ function getWordTiming(scene: CaptionScene, wordCount: number, sourceIndex: numb
 function getActiveWordIndex(scene: CaptionScene, wordCount: number, localTime: number) {
   const readableDuration = Math.max(0.6, scene.duration * 0.84);
   const step = readableDuration / Math.max(1, wordCount);
-  return clamp(Math.floor((localTime - 0.16) / step), 0, Math.max(0, wordCount - 1));
+  const activeWordCount = clamp(Math.round(scene.activeWordCount || 1), 1, 8);
+  const rawIndex = clamp(Math.floor((localTime - 0.16) / step), 0, Math.max(0, wordCount - 1));
+  return clamp(Math.floor(rawIndex / activeWordCount) * activeWordCount, 0, Math.max(0, wordCount - 1));
 }
 
 function getVisibleWordRange(scene: CaptionScene, settings: RenderSettings, words: string[], activeIndex: number) {
@@ -612,7 +620,8 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
       width,
       emphasis: clean.length > 7 || /[!?]$/.test(word) ? 1 : 0,
       active: isActive,
-      justifyGap: 0
+      justifyGap: 0,
+      color: scene.wordColors?.[sourceIndex]
     });
     currentWidth += (current.length > 1 ? gap : 0) + width;
   });
@@ -648,8 +657,8 @@ function layoutWords(ctx: CanvasRenderingContext2D, settings: RenderSettings, sc
         ...word,
         justifyGap: extraGap,
         line: lineIndex,
-        x,
-        y: startY + lineIndex * lineHeight
+        x: x + settings.width * ((scene.offsetX ?? 0) / 100),
+        y: startY + lineIndex * lineHeight + settings.height * ((scene.offsetY ?? 0) / 100)
       };
       x += word.width + gap + extraGap;
       return token;
@@ -911,6 +920,28 @@ function drawGuides(ctx: CanvasRenderingContext2D, settings: RenderSettings) {
   roundRect(ctx, x, y, width, height, 28);
   ctx.stroke();
   ctx.restore();
+}
+
+function getTextFillStyle(ctx: CanvasRenderingContext2D, settings: RenderSettings, token: WordToken, fontSize: number) {
+  if (token.color) {
+    return token.color;
+  }
+
+  if (settings.font.textColorMode === 'gradient') {
+    const angle = ((settings.font.gradientDirection - 90) * Math.PI) / 180;
+    const length = Math.max(token.width, fontSize * 1.4);
+    const centerX = token.width / 2;
+    const centerY = 0;
+    const x = Math.cos(angle) * length;
+    const y = Math.sin(angle) * length;
+    const gradient = ctx.createLinearGradient(centerX - x, centerY - y, centerX + x, centerY + y);
+    gradient.addColorStop(0, settings.font.gradientFrom);
+    gradient.addColorStop(0.5, settings.font.gradientMid);
+    gradient.addColorStop(1, settings.font.gradientTo);
+    return gradient;
+  }
+
+  return settings.font.textColor || settings.foreground;
 }
 
 function drawHighlight(
@@ -1259,19 +1290,7 @@ function drawWord(
     strokeText(ctx, token.value, 0, 0, letterSpacing);
   }
 
-  if (scene.typographyStyle === 'liquid') {
-    ctx.fillStyle = token.active ? '#B8F3FF' : '#42D9FF';
-  } else if (scene.typographyStyle === 'retro') {
-    ctx.fillStyle = token.active ? '#FFD60A' : '#FF7A00';
-  } else if (scene.typographyStyle === 'ui-tech' || scene.animationStyle === 'tech-hud') {
-    ctx.fillStyle = token.active ? '#FFFFFF' : '#B9F3FF';
-  } else if (scene.typographyStyle === 'cinematic' || scene.animationStyle === 'luxury-title') {
-    ctx.fillStyle = token.active ? '#FFFFFF' : '#E7DCC2';
-  } else if (scene.typographyStyle === 'minimal') {
-    ctx.fillStyle = token.active ? '#FFFFFF' : 'rgba(244, 242, 234, 0.82)';
-  } else {
-    ctx.fillStyle = token.active && scene.animationStyle !== 'karaoke' ? '#FFFFFF' : settings.foreground;
-  }
+  ctx.fillStyle = getTextFillStyle(ctx, settings, token, fontSize);
 
   if (scene.animationStyle === 'typewriter' || scene.typographyStyle === 'mask-reveal' || scene.typographyStyle === 'handwritten') {
     const reveal = clamp((localTime - token.start) / (scene.typographyStyle === 'handwritten' ? 0.72 : 0.24), 0, 1);
@@ -1297,8 +1316,6 @@ function drawWord(
 
 function drawSceneBackdrop(ctx: CanvasRenderingContext2D, settings: RenderSettings, scene: CaptionScene, localTime: number) {
   if (
-    scene.animationStyle !== 'lower-third' &&
-    scene.animationStyle !== 'news-ticker' &&
     scene.animationStyle !== 'tech-hud' &&
     scene.typographyStyle !== 'ui-tech' &&
     scene.typographyStyle !== 'retro'

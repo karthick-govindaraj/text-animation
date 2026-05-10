@@ -1,0 +1,358 @@
+{
+  "_readme": "Kinetic Text Studio — AI Reference Schema v1. Paste this file to an AI with your content brief. The AI should return a valid project JSON that can be imported directly into the app via Import JSON.",
+  "_schema": {
+    "version": {
+      "type": "number",
+      "required": true,
+      "value": 1,
+      "description": "Always set to 1."
+    },
+    "createdAt": {
+      "type": "ISO 8601 date string",
+      "required": true,
+      "description": "Creation timestamp."
+    },
+    "aspect": {
+      "type": "string",
+      "required": true,
+      "validValues": ["9:16", "16:9", "1:1"]
+    },
+    "fps": {
+      "type": "number",
+      "required": true,
+      "validValues": [24, 30, 60]
+    },
+    "safeArea": {
+      "type": "string",
+      "required": true,
+      "validValues": ["none", "tiktok", "reels", "shorts"]
+    },
+    "showGuides": {
+      "type": "boolean",
+      "required": true
+    },
+    "font": {
+      "description": "Global typography settings applied to all scenes.",
+      "fields": {
+        "family": {
+          "type": "string",
+          "validValues": [
+            "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+            "Bebas Neue, Impact, sans-serif",
+            "Anton, Impact, sans-serif",
+            "Montserrat, Arial, sans-serif",
+            "Poppins, Arial, sans-serif",
+            "DM Sans, Arial, sans-serif",
+            "Manrope, Arial, sans-serif",
+            "Sora, Arial, sans-serif",
+            "Space Grotesk, Arial, sans-serif",
+            "Oswald, Arial Narrow, sans-serif",
+            "League Spartan, Arial, sans-serif",
+            "Orbitron, ui-monospace, monospace",
+            "Cinzel, Georgia, serif",
+            "Playfair Display, Georgia, serif",
+            "Monsieur La Doulaise, cursive",
+            "Barlow Condensed, Arial Narrow, sans-serif",
+            "Teko, Arial Narrow, sans-serif",
+            "Rajdhani, Arial, sans-serif",
+            "Audiowide, ui-monospace, monospace",
+            "Archivo Black, Arial Black, sans-serif",
+            "Russo One, Arial Black, sans-serif",
+            "Bungee, Arial Black, sans-serif",
+            "Righteous, Arial Black, sans-serif",
+            "Permanent Marker, cursive"
+          ]
+        },
+        "weight": {
+          "type": "number",
+          "validValues": [400, 500, 600, 700, 800, 900]
+        },
+        "sizeScale": {
+          "type": "number",
+          "range": "0.55 to 1.6"
+        },
+        "uppercase": {
+          "type": "boolean"
+        },
+        "letterSpacing": {
+          "type": "number",
+          "range": "0 to 12"
+        },
+        "lineHeight": {
+          "type": "number",
+          "range": "0.85 to 1.5"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "range": "0 to 0.14"
+        },
+        "shadowBlur": {
+          "type": "number",
+          "range": "0 to 64"
+        },
+        "highlightShape": {
+          "type": "string",
+          "validValues": ["pill", "box", "underline", "none"]
+        },
+        "maxWordsPerLine": {
+          "type": "number",
+          "range": "1 to 8"
+        },
+        "position": {
+          "type": "string",
+          "validValues": ["upper", "center", "lower", "safe-lower"]
+        },
+        "textAlign": {
+          "type": "string",
+          "validValues": ["left", "center", "right", "justify"]
+        },
+        "textColorMode": {
+          "type": "string",
+          "validValues": ["solid", "gradient"]
+        },
+        "textColor": {
+          "type": "hex colour string",
+          "description": "Used when textColorMode is solid."
+        },
+        "gradientFrom": {
+          "type": "hex colour string"
+        },
+        "gradientMid": {
+          "type": "hex colour string"
+        },
+        "gradientTo": {
+          "type": "hex colour string"
+        },
+        "gradientDirection": {
+          "type": "number",
+          "range": "0 to 360"
+        }
+      }
+    },
+    "brand": {
+      "description": "Internal compatibility object. The Brand Kit UI has been removed, but existing project files may still include this object.",
+      "fields": {
+        "colors": { "type": "array of hex strings" },
+        "fontFamily": { "type": "CSS font-family string" },
+        "watermark": { "type": "string" },
+        "watermarkEnabled": { "type": "boolean" }
+      }
+    },
+    "background": {
+      "fields": {
+        "mode": {
+          "type": "string",
+          "validValues": ["transparent", "solid", "gradient", "image", "video"]
+        },
+        "solidColor": { "type": "hex colour string" },
+        "gradientFrom": { "type": "hex colour string" },
+        "gradientTo": { "type": "hex colour string" },
+        "gradientDirection": { "type": "number", "range": "0 to 360" },
+        "mediaDataUrl": { "type": "string" },
+        "mediaName": { "type": "string" },
+        "mediaFit": { "type": "string", "validValues": ["cover", "contain", "stretch"] },
+        "includeInExport": { "type": "boolean" }
+      }
+    },
+    "audio": {
+      "fields": {
+        "enabled": { "type": "boolean" },
+        "preset": {
+          "type": "string",
+          "validValues": [
+            "cinematic-boom",
+            "bass-hit",
+            "whoosh",
+            "impact-hit",
+            "glitch-fx",
+            "rise-sweep",
+            "sub-drop",
+            "tick-clock-fx",
+            "reverse-cymbal",
+            "trailer-braam",
+            "ui-click-sounds",
+            "typewriter-fx",
+            "echo-hit",
+            "pulse-bass",
+            "trap-beat",
+            "phonk-beat",
+            "synthwave-beat",
+            "cyberpunk-ambience",
+            "epic-trailer-music",
+            "lo-fi-beat",
+            "glitch-bass",
+            "percussion-hits",
+            "stomp-beat",
+            "hybrid-orchestral-beat",
+            "edm-build-up",
+            "heartbeat-fx",
+            "vinyl-scratch",
+            "digital-beep-fx",
+            "neon-hum-ambience",
+            "vocal-chop-beat"
+          ]
+        },
+        "volume": { "type": "number", "range": "0 to 1" },
+        "intensity": { "type": "number", "range": "0.1 to 1" },
+        "autoSelect": { "type": "boolean" }
+      }
+    },
+    "scenes": {
+      "type": "array of scene objects",
+      "description": "User-selectable typography controls were removed. The app automatically applies three-d typography to every scene.",
+      "fields": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "text": { "type": "string" },
+        "animationStyle": {
+          "type": "string",
+          "validValues": [
+            "punch",
+            "cascade",
+            "typewriter",
+            "drift",
+            "tiktok-bounce",
+            "shorts-pop",
+            "karaoke",
+            "glitch",
+            "lower-third",
+            "word-zoom",
+            "caption-stack",
+            "neon-flicker",
+            "minimal-fade",
+            "stomp",
+            "elastic-pop",
+            "news-ticker",
+            "clean-subtitle",
+            "comic-pop",
+            "luxury-title",
+            "tech-hud"
+          ]
+        },
+        "accent": { "type": "hex colour string" },
+        "duration": { "type": "number", "range": "0.5 to 300" },
+        "activeWordCount": {
+          "type": "number",
+          "range": "1 to 8",
+          "description": "Number of words animated simultaneously. Groups are non-overlapping: 1-3, then 4-6, then 7-9."
+        },
+        "wordColors": {
+          "type": "object",
+          "description": "Per-word colour overrides. Keys are zero-based word indexes and values are hex colours.",
+          "example": { "2": "#FF3B30" }
+        },
+        "offsetX": {
+          "type": "number",
+          "range": "-50 to 50",
+          "description": "Manual horizontal text offset as a percentage of canvas width. 0 = default."
+        },
+        "offsetY": {
+          "type": "number",
+          "range": "-50 to 50",
+          "description": "Manual vertical text offset as a percentage of canvas height. 0 = default."
+        }
+      }
+    }
+  },
+  "_ai_instructions": "When generating a project JSON from this schema: output only the importable project JSON; do not include _readme, _schema, or _ai_instructions. Generate 4-8 short scenes. Do not include typographyStyle; the app applies three-d automatically. Use activeWordCount 1-3 for most scenes, wordColors for 1-2 power words, and offsetX/offsetY only when the text needs manual placement.",
+  "version": 1,
+  "createdAt": "2026-05-10T09:00:00.000Z",
+  "aspect": "9:16",
+  "fps": 30,
+  "safeArea": "tiktok",
+  "showGuides": false,
+  "font": {
+    "family": "Bebas Neue, Impact, sans-serif",
+    "weight": 900,
+    "sizeScale": 1,
+    "uppercase": true,
+    "letterSpacing": 0,
+    "lineHeight": 1.08,
+    "strokeWidth": 0.06,
+    "shadowBlur": 24,
+    "highlightShape": "pill",
+    "maxWordsPerLine": 4,
+    "position": "center",
+    "textAlign": "center",
+    "textColorMode": "solid",
+    "textColor": "#F4F2EA",
+    "gradientFrom": "#FFFFFF",
+    "gradientMid": "#FFD60A",
+    "gradientTo": "#FF3B30",
+    "gradientDirection": 90
+  },
+  "brand": {
+    "colors": ["#FF3B30", "#FFD60A", "#32D74B", "#64D2FF", "#BF5AF2", "#FF9F0A"],
+    "fontFamily": "Inter, Arial, sans-serif",
+    "watermark": "",
+    "watermarkEnabled": false
+  },
+  "background": {
+    "mode": "solid",
+    "solidColor": "#0e1014",
+    "gradientFrom": "#111318",
+    "gradientTo": "#29313f",
+    "gradientDirection": 135,
+    "mediaDataUrl": "",
+    "mediaName": "",
+    "mediaFit": "cover",
+    "includeInExport": true
+  },
+  "audio": {
+    "enabled": true,
+    "preset": "whoosh",
+    "volume": 0.55,
+    "intensity": 0.65,
+    "autoSelect": true
+  },
+  "scenes": [
+    {
+      "id": "scene-001",
+      "title": "Hook",
+      "text": "Most captions fail.",
+      "animationStyle": "punch",
+      "accent": "#FF3B30",
+      "duration": 1.8,
+      "activeWordCount": 2,
+      "wordColors": { "2": "#FF3B30" },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "id": "scene-002",
+      "title": "Problem",
+      "text": "They move too slowly.",
+      "animationStyle": "stomp",
+      "accent": "#FFD60A",
+      "duration": 2,
+      "activeWordCount": 2,
+      "wordColors": {},
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "id": "scene-003",
+      "title": "Solution",
+      "text": "Kinetic text keeps them watching.",
+      "animationStyle": "word-zoom",
+      "accent": "#32D74B",
+      "duration": 2.8,
+      "activeWordCount": 3,
+      "wordColors": { "0": "#FFD60A", "1": "#FFD60A" },
+      "offsetX": 0,
+      "offsetY": -4
+    },
+    {
+      "id": "scene-004",
+      "title": "CTA",
+      "text": "Try it now.",
+      "animationStyle": "glitch",
+      "accent": "#64D2FF",
+      "duration": 2,
+      "activeWordCount": 2,
+      "wordColors": { "2": "#32D74B" },
+      "offsetX": 0,
+      "offsetY": 6
+    }
+  ]
+}
