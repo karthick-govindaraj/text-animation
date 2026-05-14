@@ -1,209 +1,28 @@
 {
-  "_readme": "Kinetic Text Studio — AI Reference Schema v1. Paste this file to an AI with your content brief. The AI should return a valid project JSON that can be imported directly into the app via Import JSON.",
+  "_readme": "Kinetic Text Studio — Scene Premium JSON v2. Paste this schema to an AI with your content brief. The AI should return an importable project JSON using the same top-level shape, excluding _readme, _schema, and _ai_instructions.",
   "_schema": {
     "version": {
       "type": "number",
       "required": true,
-      "value": 1,
-      "description": "Always set to 1."
+      "value": 2
     },
-    "createdAt": {
-      "type": "ISO 8601 date string",
-      "required": true,
-      "description": "Creation timestamp."
-    },
-    "aspect": {
+    "schema": {
       "type": "string",
       "required": true,
-      "validValues": ["9:16", "16:9", "1:1"]
-    },
-    "fps": {
-      "type": "number",
-      "required": true,
-      "validValues": [24, 30, 60]
-    },
-    "safeArea": {
-      "type": "string",
-      "required": true,
-      "validValues": ["none", "tiktok", "reels", "shorts"]
-    },
-    "showGuides": {
-      "type": "boolean",
-      "required": true
-    },
-    "font": {
-      "description": "Global typography settings applied to all scenes.",
-      "fields": {
-        "family": {
-          "type": "string",
-          "validValues": [
-            "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-            "Bebas Neue, Impact, sans-serif",
-            "Anton, Impact, sans-serif",
-            "Montserrat, Arial, sans-serif",
-            "Poppins, Arial, sans-serif",
-            "DM Sans, Arial, sans-serif",
-            "Manrope, Arial, sans-serif",
-            "Sora, Arial, sans-serif",
-            "Space Grotesk, Arial, sans-serif",
-            "Oswald, Arial Narrow, sans-serif",
-            "League Spartan, Arial, sans-serif",
-            "Orbitron, ui-monospace, monospace",
-            "Cinzel, Georgia, serif",
-            "Playfair Display, Georgia, serif",
-            "Monsieur La Doulaise, cursive",
-            "Barlow Condensed, Arial Narrow, sans-serif",
-            "Teko, Arial Narrow, sans-serif",
-            "Rajdhani, Arial, sans-serif",
-            "Audiowide, ui-monospace, monospace",
-            "Archivo Black, Arial Black, sans-serif",
-            "Russo One, Arial Black, sans-serif",
-            "Bungee, Arial Black, sans-serif",
-            "Righteous, Arial Black, sans-serif",
-            "Permanent Marker, cursive"
-          ]
-        },
-        "weight": {
-          "type": "number",
-          "validValues": [400, 500, 600, 700, 800, 900]
-        },
-        "sizeScale": {
-          "type": "number",
-          "range": "0.55 to 1.6"
-        },
-        "uppercase": {
-          "type": "boolean"
-        },
-        "letterSpacing": {
-          "type": "number",
-          "range": "0 to 12"
-        },
-        "lineHeight": {
-          "type": "number",
-          "range": "0.85 to 1.5"
-        },
-        "strokeWidth": {
-          "type": "number",
-          "range": "0 to 0.14"
-        },
-        "shadowBlur": {
-          "type": "number",
-          "range": "0 to 64"
-        },
-        "highlightShape": {
-          "type": "string",
-          "validValues": ["pill", "box", "underline", "none"]
-        },
-        "maxWordsPerLine": {
-          "type": "number",
-          "range": "1 to 8"
-        },
-        "position": {
-          "type": "string",
-          "validValues": ["upper", "center", "lower", "safe-lower"]
-        },
-        "textAlign": {
-          "type": "string",
-          "validValues": ["left", "center", "right", "justify"]
-        },
-        "textColorMode": {
-          "type": "string",
-          "validValues": ["solid", "gradient"]
-        },
-        "textColor": {
-          "type": "hex colour string",
-          "description": "Used when textColorMode is solid."
-        },
-        "gradientFrom": {
-          "type": "hex colour string"
-        },
-        "gradientMid": {
-          "type": "hex colour string"
-        },
-        "gradientTo": {
-          "type": "hex colour string"
-        },
-        "gradientDirection": {
-          "type": "number",
-          "range": "0 to 360"
-        }
-      }
-    },
-    "brand": {
-      "description": "Internal compatibility object. The Brand Kit UI has been removed, but existing project files may still include this object.",
-      "fields": {
-        "colors": { "type": "array of hex strings" },
-        "fontFamily": { "type": "CSS font-family string" },
-        "watermark": { "type": "string" },
-        "watermarkEnabled": { "type": "boolean" }
-      }
-    },
-    "background": {
-      "fields": {
-        "mode": {
-          "type": "string",
-          "validValues": ["transparent", "solid", "gradient", "image", "video"]
-        },
-        "solidColor": { "type": "hex colour string" },
-        "gradientFrom": { "type": "hex colour string" },
-        "gradientTo": { "type": "hex colour string" },
-        "gradientDirection": { "type": "number", "range": "0 to 360" },
-        "mediaDataUrl": { "type": "string" },
-        "mediaName": { "type": "string" },
-        "mediaFit": { "type": "string", "validValues": ["cover", "contain", "stretch"] },
-        "includeInExport": { "type": "boolean" }
-      }
-    },
-    "audio": {
-      "fields": {
-        "enabled": { "type": "boolean" },
-        "preset": {
-          "type": "string",
-          "validValues": [
-            "cinematic-boom",
-            "bass-hit",
-            "whoosh",
-            "impact-hit",
-            "glitch-fx",
-            "rise-sweep",
-            "sub-drop",
-            "tick-clock-fx",
-            "reverse-cymbal",
-            "trailer-braam",
-            "ui-click-sounds",
-            "typewriter-fx",
-            "echo-hit",
-            "pulse-bass",
-            "trap-beat",
-            "phonk-beat",
-            "synthwave-beat",
-            "cyberpunk-ambience",
-            "epic-trailer-music",
-            "lo-fi-beat",
-            "glitch-bass",
-            "percussion-hits",
-            "stomp-beat",
-            "hybrid-orchestral-beat",
-            "edm-build-up",
-            "heartbeat-fx",
-            "vinyl-scratch",
-            "digital-beep-fx",
-            "neon-hum-ambience",
-            "vocal-chop-beat"
-          ]
-        },
-        "volume": { "type": "number", "range": "0 to 1" },
-        "intensity": { "type": "number", "range": "0.1 to 1" },
-        "autoSelect": { "type": "boolean" }
-      }
+      "value": "scene-premium-v2"
     },
     "scenes": {
-      "type": "array of scene objects",
-      "description": "User-selectable typography controls were removed. The app automatically applies three-d typography to every scene.",
+      "type": "array",
+      "description": "Scene-based premium video plan. No timeline layers are required in v2.",
       "fields": {
         "id": { "type": "string" },
         "title": { "type": "string" },
         "text": { "type": "string" },
+        "intent": {
+          "type": "string",
+          "validValues": ["hook", "proof", "warning", "reveal", "example", "cta"]
+        },
+        "visualIntensity": { "type": "number", "range": "0 to 1" },
         "animationStyle": {
           "type": "string",
           "validValues": [
@@ -229,34 +48,85 @@
             "tech-hud"
           ]
         },
-        "accent": { "type": "hex colour string" },
-        "duration": { "type": "number", "range": "0.5 to 300" },
-        "activeWordCount": {
-          "type": "number",
-          "range": "1 to 8",
-          "description": "Number of words animated simultaneously. Groups are non-overlapping: 1-3, then 4-6, then 7-9."
+        "broll": {
+          "description": "Image-only scene B-roll. Provide exactly 3 ranked candidates when possible. The app tries rank 1 first, then rank 2 and rank 3 if loading or CORS export validation fails.",
+          "fields": {
+            "enabled": { "type": "boolean" },
+            "query": { "type": "string" },
+            "purpose": { "type": "string" },
+            "selectedAssetId": { "type": "string" },
+            "fallbackMode": { "type": "string", "validValues": ["try-next-provider"] },
+            "assets": {
+              "type": "array of 3 image candidates",
+              "fields": {
+                "id": { "type": "string" },
+                "rank": { "type": "number", "validValues": [1, 2, 3] },
+                "source": { "type": "string", "examples": ["Pexels", "Unsplash", "Pixabay"] },
+                "title": { "type": "string" },
+                "imageUrl": { "type": "direct image URL" },
+                "pageUrl": { "type": "source page URL" },
+                "license": { "type": "string" },
+                "creator": { "type": "string" },
+                "width": { "type": "number" },
+                "height": { "type": "number" },
+                "relevanceScore": { "type": "number", "range": "0 to 1" }
+              }
+            },
+            "fit": { "type": "string", "validValues": ["cover", "contain", "stretch"] },
+            "opacity": { "type": "number", "range": "0 to 1" },
+            "darken": { "type": "number", "range": "0 to 1" },
+            "blur": { "type": "number", "range": "0 to 40" },
+            "vignette": { "type": "number", "range": "0 to 1" }
+          }
         },
-        "wordColors": {
-          "type": "object",
-          "description": "Per-word colour overrides. Keys are zero-based word indexes and values are hex colours.",
-          "example": { "2": "#FF3B30" }
+        "camera": {
+          "description": "Simple scene-level Ken Burns camera motion.",
+          "fields": {
+            "enabled": { "type": "boolean" },
+            "zoomFrom": { "type": "number" },
+            "zoomTo": { "type": "number" },
+            "panXFrom": { "type": "number", "range": "-1 to 1" },
+            "panXTo": { "type": "number", "range": "-1 to 1" },
+            "panYFrom": { "type": "number", "range": "-1 to 1" },
+            "panYTo": { "type": "number", "range": "-1 to 1" },
+            "easing": { "type": "string", "validValues": ["linear", "easeInOut", "easeOutCubic"] }
+          }
         },
-        "offsetX": {
-          "type": "number",
-          "range": "-50 to 50",
-          "description": "Manual horizontal text offset as a percentage of canvas width. 0 = default."
+        "transitionIn": {
+          "fields": {
+            "type": { "type": "string", "validValues": ["none", "fade", "zoom", "slide", "blur", "flash"] },
+            "duration": { "type": "number", "range": "0 to 3" },
+            "direction": { "type": "string", "validValues": ["left", "right", "up", "down"] }
+          }
         },
-        "offsetY": {
-          "type": "number",
-          "range": "-50 to 50",
-          "description": "Manual vertical text offset as a percentage of canvas height. 0 = default."
+        "transitionOut": {
+          "fields": {
+            "type": { "type": "string", "validValues": ["none", "fade", "zoom", "slide", "blur", "flash"] },
+            "duration": { "type": "number", "range": "0 to 3" },
+            "direction": { "type": "string", "validValues": ["left", "right", "up", "down"] }
+          }
+        },
+        "graphics": {
+          "description": "Simple scene-local graphic overlays, timed in seconds relative to the scene.",
+          "fields": {
+            "type": { "type": "string", "validValues": ["arrow", "circle", "underline", "stat-card", "warning-label", "quote-card"] },
+            "start": { "type": "number" },
+            "end": { "type": "number" },
+            "x": { "type": "number", "range": "0 to 1" },
+            "y": { "type": "number", "range": "0 to 1" },
+            "text": { "type": "string" },
+            "value": { "type": "string" },
+            "color": { "type": "hex colour string" },
+            "animation": { "type": "string", "validValues": ["fade", "pop", "slide", "draw"] }
+          }
         }
       }
     }
   },
-  "_ai_instructions": "When generating a project JSON from this schema: output only the importable project JSON; do not include _readme, _schema, or _ai_instructions. Generate 4-8 short scenes. Do not include typographyStyle; the app applies three-d automatically. Use activeWordCount 1-3 for most scenes, wordColors for 1-2 power words, and offsetX/offsetY only when the text needs manual placement.",
-  "version": 1,
-  "createdAt": "2026-05-10T09:00:00.000Z",
+  "_ai_instructions": "Return valid JSON only. Use version 2 and schema scene-premium-v2. Keep scenes concise. For every scene that needs B-roll, provide 3 ranked image candidates from Pexels, Unsplash, and Pixabay when possible. Do not include typographyStyle; the app applies three-d automatically. Use B-roll only when it proves, clarifies, or adds a strong pattern interrupt.",
+  "version": 2,
+  "schema": "scene-premium-v2",
+  "createdAt": "2026-05-13T09:00:00.000Z",
   "aspect": "9:16",
   "fps": 30,
   "safeArea": "tiktok",
@@ -278,81 +148,267 @@
     "textColor": "#F4F2EA",
     "gradientFrom": "#FFFFFF",
     "gradientMid": "#FFD60A",
-    "gradientTo": "#FF3B30",
-    "gradientDirection": 90
+    "gradientTo": "#FFD60A",
+    "gradientDirection": 0
   },
   "brand": {
     "colors": ["#FF3B30", "#FFD60A", "#32D74B", "#64D2FF", "#BF5AF2", "#FF9F0A"],
     "fontFamily": "Inter, Arial, sans-serif",
-    "watermark": "",
+    "watermark": "Kinetic Text",
     "watermarkEnabled": false
   },
   "background": {
-    "mode": "solid",
-    "solidColor": "#0e1014",
+    "mode": "transparent",
+    "solidColor": "#111318",
     "gradientFrom": "#111318",
     "gradientTo": "#29313f",
     "gradientDirection": 135,
     "mediaDataUrl": "",
     "mediaName": "",
     "mediaFit": "cover",
-    "includeInExport": true
+    "includeInExport": false
   },
   "audio": {
-    "enabled": true,
-    "preset": "whoosh",
+    "enabled": false,
+    "preset": "pulse-bass",
     "volume": 0.55,
     "intensity": 0.65,
     "autoSelect": true
   },
   "scenes": [
     {
-      "id": "scene-001",
+      "id": "scene-hook",
       "title": "Hook",
-      "text": "Most captions fail.",
-      "animationStyle": "punch",
-      "accent": "#FF3B30",
-      "duration": 1.8,
-      "activeWordCount": 2,
-      "wordColors": { "2": "#FF3B30" },
-      "offsetX": 0,
-      "offsetY": 0
-    },
-    {
-      "id": "scene-002",
-      "title": "Problem",
-      "text": "They move too slowly.",
+      "text": "Most videos lose attention before the point lands.",
+      "intent": "hook",
+      "visualIntensity": 0.9,
       "animationStyle": "stomp",
-      "accent": "#FFD60A",
-      "duration": 2,
+      "accent": "#FF3B30",
+      "duration": 4.2,
       "activeWordCount": 2,
-      "wordColors": {},
+      "wordColors": { "3": "#FF3B30" },
       "offsetX": 0,
-      "offsetY": 0
+      "offsetY": 0,
+      "broll": {
+        "enabled": true,
+        "query": "person scrolling phone social media",
+        "purpose": "Show the viewer behavior being discussed.",
+        "selectedAssetId": "hook-pexels",
+        "fallbackMode": "try-next-provider",
+        "assets": [
+          {
+            "id": "hook-pexels",
+            "rank": 1,
+            "source": "Pexels",
+            "title": "Person Using Smartphone",
+            "imageUrl": "https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg",
+            "pageUrl": "https://www.pexels.com/photo/person-holding-smartphone-607812/",
+            "license": "Pexels License",
+            "creator": "freestocks.org",
+            "relevanceScore": 0.92
+          },
+          {
+            "id": "hook-unsplash",
+            "rank": 2,
+            "source": "Unsplash",
+            "title": "Phone in Hand",
+            "imageUrl": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3",
+            "pageUrl": "https://unsplash.com/photos/person-holding-smartphone",
+            "license": "Unsplash License",
+            "creator": "Unsplash Contributor",
+            "relevanceScore": 0.84
+          },
+          {
+            "id": "hook-pixabay",
+            "rank": 3,
+            "source": "Pixabay",
+            "title": "Mobile Phone",
+            "imageUrl": "https://cdn.pixabay.com/photo/2016/11/29/12/30/phone-1869510_1280.jpg",
+            "pageUrl": "https://pixabay.com/photos/phone-mobile-smartphone-1869510/",
+            "license": "Pixabay Content License",
+            "creator": "Pixabay",
+            "relevanceScore": 0.78
+          }
+        ],
+        "fit": "cover",
+        "opacity": 1,
+        "darken": 0.42,
+        "blur": 0,
+        "vignette": 0.32
+      },
+      "camera": {
+        "enabled": true,
+        "zoomFrom": 1,
+        "zoomTo": 1.16,
+        "panXFrom": 0,
+        "panXTo": -0.04,
+        "panYFrom": 0,
+        "panYTo": 0.02,
+        "easing": "easeOutCubic"
+      },
+      "transitionIn": { "type": "flash", "duration": 0.18, "direction": "left" },
+      "transitionOut": { "type": "zoom", "duration": 0.22, "direction": "left" },
+      "graphics": [
+        {
+          "id": "hook-warning",
+          "type": "warning-label",
+          "start": 0.25,
+          "end": 2.4,
+          "x": 0.5,
+          "y": 0.22,
+          "text": "RETENTION DROP",
+          "color": "#FF3B30",
+          "animation": "pop"
+        }
+      ]
     },
     {
-      "id": "scene-003",
-      "title": "Solution",
-      "text": "Kinetic text keeps them watching.",
+      "id": "scene-proof",
+      "title": "Proof",
+      "text": "Premium edits reset the screen before the viewer gets bored.",
+      "intent": "proof",
+      "visualIntensity": 0.7,
+      "animationStyle": "caption-stack",
+      "accent": "#FFD60A",
+      "duration": 5,
+      "activeWordCount": 3,
+      "wordColors": { "1": "#FFD60A", "5": "#64D2FF" },
+      "offsetX": 0,
+      "offsetY": 0,
+      "broll": {
+        "enabled": true,
+        "query": "video editing timeline computer screen",
+        "purpose": "Represent premium editing and visual pacing.",
+        "selectedAssetId": "proof-pexels",
+        "fallbackMode": "try-next-provider",
+        "assets": [
+          {
+            "id": "proof-pexels",
+            "rank": 1,
+            "source": "Pexels",
+            "title": "Video Editing",
+            "imageUrl": "https://images.pexels.com/photos/2510428/pexels-photo-2510428.jpeg",
+            "pageUrl": "https://www.pexels.com/photo/person-using-macbook-pro-2510428/",
+            "license": "Pexels License",
+            "creator": "Pexels Contributor",
+            "relevanceScore": 0.88
+          },
+          {
+            "id": "proof-unsplash",
+            "rank": 2,
+            "source": "Unsplash",
+            "title": "Editing Desk",
+            "imageUrl": "https://images.unsplash.com/photo-1497366754035-f200968a6e72",
+            "pageUrl": "https://unsplash.com/photos/workspace",
+            "license": "Unsplash License",
+            "creator": "Unsplash Contributor",
+            "relevanceScore": 0.74
+          },
+          {
+            "id": "proof-pixabay",
+            "rank": 3,
+            "source": "Pixabay",
+            "title": "Computer Workstation",
+            "imageUrl": "https://cdn.pixabay.com/photo/2015/01/08/18/25/startup-593327_1280.jpg",
+            "pageUrl": "https://pixabay.com/photos/startup-start-up-people-593327/",
+            "license": "Pixabay Content License",
+            "creator": "Pixabay",
+            "relevanceScore": 0.72
+          }
+        ],
+        "fit": "cover",
+        "opacity": 1,
+        "darken": 0.36,
+        "blur": 2,
+        "vignette": 0.26
+      },
+      "camera": {
+        "enabled": true,
+        "zoomFrom": 1.04,
+        "zoomTo": 1.13,
+        "panXFrom": 0.02,
+        "panXTo": -0.02,
+        "panYFrom": 0,
+        "panYTo": -0.01,
+        "easing": "easeInOut"
+      },
+      "transitionIn": { "type": "fade", "duration": 0.25, "direction": "left" },
+      "transitionOut": { "type": "blur", "duration": 0.22, "direction": "left" },
+      "graphics": [
+        {
+          "id": "proof-stat",
+          "type": "stat-card",
+          "start": 1.1,
+          "end": 3.8,
+          "x": 0.5,
+          "y": 0.76,
+          "text": "SCREEN RESET",
+          "value": "3-7s",
+          "color": "#FFD60A",
+          "animation": "slide"
+        },
+        {
+          "id": "proof-underline",
+          "type": "underline",
+          "start": 2.6,
+          "end": 4.2,
+          "x": 0.5,
+          "y": 0.58,
+          "color": "#64D2FF",
+          "animation": "draw"
+        }
+      ]
+    },
+    {
+      "id": "scene-cta",
+      "title": "CTA",
+      "text": "Use scenes, B-roll, and motion to make every second earn attention.",
+      "intent": "cta",
+      "visualIntensity": 0.6,
       "animationStyle": "word-zoom",
       "accent": "#32D74B",
-      "duration": 2.8,
-      "activeWordCount": 3,
-      "wordColors": { "0": "#FFD60A", "1": "#FFD60A" },
-      "offsetX": 0,
-      "offsetY": -4
-    },
-    {
-      "id": "scene-004",
-      "title": "CTA",
-      "text": "Try it now.",
-      "animationStyle": "glitch",
-      "accent": "#64D2FF",
-      "duration": 2,
+      "duration": 4.8,
       "activeWordCount": 2,
-      "wordColors": { "2": "#32D74B" },
+      "wordColors": { "2": "#32D74B", "5": "#FFD60A" },
       "offsetX": 0,
-      "offsetY": 6
+      "offsetY": 0,
+      "broll": {
+        "enabled": false,
+        "query": "",
+        "purpose": "",
+        "selectedAssetId": "",
+        "fallbackMode": "try-next-provider",
+        "assets": [],
+        "fit": "cover",
+        "opacity": 1,
+        "darken": 0.25,
+        "blur": 0,
+        "vignette": 0.2
+      },
+      "camera": {
+        "enabled": true,
+        "zoomFrom": 1,
+        "zoomTo": 1.08,
+        "panXFrom": 0,
+        "panXTo": 0,
+        "panYFrom": 0,
+        "panYTo": 0,
+        "easing": "easeOutCubic"
+      },
+      "transitionIn": { "type": "slide", "duration": 0.24, "direction": "up" },
+      "transitionOut": { "type": "fade", "duration": 0.25, "direction": "left" },
+      "graphics": [
+        {
+          "id": "cta-arrow",
+          "type": "arrow",
+          "start": 1.2,
+          "end": 3.6,
+          "x": 0.5,
+          "y": 0.74,
+          "color": "#32D74B",
+          "animation": "pop"
+        }
+      ]
     }
   ]
 }

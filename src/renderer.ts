@@ -50,6 +50,12 @@ export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 export type BackgroundMode = 'transparent' | 'solid' | 'gradient' | 'image' | 'video';
 export type BackgroundFit = 'cover' | 'contain' | 'stretch';
 export type TextColorMode = 'solid' | 'gradient';
+export type SceneIntent = 'hook' | 'proof' | 'warning' | 'reveal' | 'example' | 'cta';
+export type CameraEasing = 'linear' | 'easeInOut' | 'easeOutCubic';
+export type SceneTransitionType = 'none' | 'fade' | 'zoom' | 'slide' | 'blur' | 'flash';
+export type SceneTransitionDirection = 'left' | 'right' | 'up' | 'down';
+export type SceneGraphicType = 'arrow' | 'circle' | 'underline' | 'stat-card' | 'warning-label' | 'quote-card';
+export type SceneGraphicAnimation = 'fade' | 'pop' | 'slide' | 'draw';
 export type AudioPresetId =
   | 'cinematic-boom'
   | 'bass-hit'
@@ -94,6 +100,71 @@ export type CaptionScene = {
   wordColors: Record<number, string>;
   offsetX: number;
   offsetY: number;
+  intent?: SceneIntent;
+  visualIntensity?: number;
+  broll: SceneBroll;
+  camera: SceneCamera;
+  transitionIn: SceneTransition;
+  transitionOut: SceneTransition;
+  graphics: SceneGraphic[];
+};
+
+export type BrollAssetCandidate = {
+  id: string;
+  rank: number;
+  source: 'Pexels' | 'Unsplash' | 'Pixabay' | string;
+  title: string;
+  imageUrl: string;
+  pageUrl: string;
+  license: string;
+  creator?: string;
+  width?: number;
+  height?: number;
+  relevanceScore?: number;
+};
+
+export type SceneBroll = {
+  enabled: boolean;
+  query: string;
+  purpose: string;
+  selectedAssetId: string;
+  fallbackMode: 'try-next-provider';
+  assets: BrollAssetCandidate[];
+  fit: BackgroundFit;
+  opacity: number;
+  darken: number;
+  blur: number;
+  vignette: number;
+};
+
+export type SceneCamera = {
+  enabled: boolean;
+  zoomFrom: number;
+  zoomTo: number;
+  panXFrom: number;
+  panXTo: number;
+  panYFrom: number;
+  panYTo: number;
+  easing: CameraEasing;
+};
+
+export type SceneTransition = {
+  type: SceneTransitionType;
+  duration: number;
+  direction?: SceneTransitionDirection;
+};
+
+export type SceneGraphic = {
+  id: string;
+  type: SceneGraphicType;
+  start: number;
+  end: number;
+  x: number;
+  y: number;
+  text?: string;
+  value?: string;
+  color: string;
+  animation: SceneGraphicAnimation;
 };
 
 export type FontControls = {
@@ -237,6 +308,37 @@ export const DEFAULT_AUDIO: AudioSettings = {
   autoSelect: true
 };
 
+export const DEFAULT_BROLL: SceneBroll = {
+  enabled: false,
+  query: '',
+  purpose: '',
+  selectedAssetId: '',
+  fallbackMode: 'try-next-provider',
+  assets: [],
+  fit: 'cover',
+  opacity: 1,
+  darken: 0.25,
+  blur: 0,
+  vignette: 0.2
+};
+
+export const DEFAULT_CAMERA: SceneCamera = {
+  enabled: true,
+  zoomFrom: 1,
+  zoomTo: 1.08,
+  panXFrom: 0,
+  panXTo: 0,
+  panYFrom: 0,
+  panYTo: 0,
+  easing: 'easeOutCubic'
+};
+
+export const DEFAULT_TRANSITION: SceneTransition = {
+  type: 'none',
+  duration: 0,
+  direction: 'left'
+};
+
 export const FONT_FAMILIES: { label: string; family: string; weight: number }[] = [
   { label: 'Sans-serif (System)', family: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', weight: 800 },
   { label: 'Bebas Neue', family: 'Bebas Neue, Impact, sans-serif', weight: 400 },
@@ -287,7 +389,25 @@ export const STYLE_PRESETS: { id: AnimationStyle; label: string; description: st
   { id: 'drift', label: 'Drift', description: 'Smooth floating motion for calm edits.' }
 ];
 
-export const SCENE_TEMPLATES: { id: string; label: string; scenes: Omit<CaptionScene, 'id' | 'activeWordCount' | 'wordColors' | 'offsetX' | 'offsetY'>[] }[] = [
+export const SCENE_TEMPLATES: {
+  id: string;
+  label: string;
+  scenes: Omit<
+    CaptionScene,
+    | 'id'
+    | 'activeWordCount'
+    | 'wordColors'
+    | 'offsetX'
+    | 'offsetY'
+    | 'intent'
+    | 'visualIntensity'
+    | 'broll'
+    | 'camera'
+    | 'transitionIn'
+    | 'transitionOut'
+    | 'graphics'
+  >[];
+}[] = [
   {
     id: 'viral-explainer',
     label: 'Hook - Problem - Solution - CTA',
@@ -420,6 +540,81 @@ export function getFrameCount(settings: RenderSettings) {
   return Math.ceil(settings.duration * settings.fps);
 }
 
+function normalizeBroll(partial?: Partial<SceneBroll>): SceneBroll {
+  return {
+    ...DEFAULT_BROLL,
+    ...(partial ?? {}),
+    fallbackMode: 'try-next-provider',
+    assets: Array.isArray(partial?.assets)
+      ? partial.assets
+          .filter((asset) => asset && typeof asset.imageUrl === 'string')
+          .map((asset, index) => ({
+            id: asset.id || `broll-${index + 1}`,
+            rank: Number.isFinite(asset.rank) ? Number(asset.rank) : index + 1,
+            source: asset.source || 'Unknown',
+            title: asset.title || `Image ${index + 1}`,
+            imageUrl: asset.imageUrl,
+            pageUrl: asset.pageUrl || '',
+            license: asset.license || '',
+            creator: asset.creator,
+            width: asset.width,
+            height: asset.height,
+            relevanceScore: asset.relevanceScore
+          }))
+      : [],
+    fit: partial?.fit ?? DEFAULT_BROLL.fit,
+    opacity: clamp(Number(partial?.opacity ?? DEFAULT_BROLL.opacity), 0, 1),
+    darken: clamp(Number(partial?.darken ?? DEFAULT_BROLL.darken), 0, 1),
+    blur: clamp(Number(partial?.blur ?? DEFAULT_BROLL.blur), 0, 40),
+    vignette: clamp(Number(partial?.vignette ?? DEFAULT_BROLL.vignette), 0, 1)
+  };
+}
+
+function normalizeCamera(partial?: Partial<SceneCamera>): SceneCamera {
+  return {
+    ...DEFAULT_CAMERA,
+    ...(partial ?? {}),
+    zoomFrom: clamp(Number(partial?.zoomFrom ?? DEFAULT_CAMERA.zoomFrom), 0.25, 4),
+    zoomTo: clamp(Number(partial?.zoomTo ?? DEFAULT_CAMERA.zoomTo), 0.25, 4),
+    panXFrom: clamp(Number(partial?.panXFrom ?? DEFAULT_CAMERA.panXFrom), -1, 1),
+    panXTo: clamp(Number(partial?.panXTo ?? DEFAULT_CAMERA.panXTo), -1, 1),
+    panYFrom: clamp(Number(partial?.panYFrom ?? DEFAULT_CAMERA.panYFrom), -1, 1),
+    panYTo: clamp(Number(partial?.panYTo ?? DEFAULT_CAMERA.panYTo), -1, 1),
+    easing: partial?.easing ?? DEFAULT_CAMERA.easing
+  };
+}
+
+function normalizeTransition(partial?: Partial<SceneTransition>): SceneTransition {
+  return {
+    ...DEFAULT_TRANSITION,
+    ...(partial ?? {}),
+    type: partial?.type ?? DEFAULT_TRANSITION.type,
+    duration: clamp(Number(partial?.duration ?? DEFAULT_TRANSITION.duration), 0, 3),
+    direction: partial?.direction ?? DEFAULT_TRANSITION.direction
+  };
+}
+
+function normalizeGraphics(graphics?: SceneGraphic[]): SceneGraphic[] {
+  return Array.isArray(graphics)
+    ? graphics.map((graphic, index) => {
+        const start = clamp(Number(graphic.start ?? 0), 0, 300);
+        const end = Math.max(start + 0.1, clamp(Number(graphic.end ?? 2), 0, 300));
+        return {
+          id: graphic.id || `graphic-${index + 1}`,
+          type: graphic.type || 'warning-label',
+          start,
+          end,
+          x: clamp(Number(graphic.x ?? 0.5), 0, 1),
+          y: clamp(Number(graphic.y ?? 0.5), 0, 1),
+          text: graphic.text ?? '',
+          value: graphic.value ?? '',
+          color: graphic.color || '#FFD60A',
+          animation: graphic.animation || 'pop'
+        };
+      })
+    : [];
+}
+
 export function createScene(partial: Partial<CaptionScene> = {}): CaptionScene {
   return {
     id: partial.id ?? crypto.randomUUID(),
@@ -432,7 +627,14 @@ export function createScene(partial: Partial<CaptionScene> = {}): CaptionScene {
     activeWordCount: clamp(Math.round(partial.activeWordCount ?? 1), 1, 8),
     wordColors: partial.wordColors ?? {},
     offsetX: clamp(Number(partial.offsetX ?? 0), -50, 50),
-    offsetY: clamp(Number(partial.offsetY ?? 0), -50, 50)
+    offsetY: clamp(Number(partial.offsetY ?? 0), -50, 50),
+    intent: partial.intent,
+    visualIntensity: clamp(Number(partial.visualIntensity ?? 0.5), 0, 1),
+    broll: normalizeBroll(partial.broll),
+    camera: normalizeCamera(partial.camera),
+    transitionIn: normalizeTransition(partial.transitionIn),
+    transitionOut: normalizeTransition(partial.transitionOut),
+    graphics: normalizeGraphics(partial.graphics)
   };
 }
 
@@ -681,6 +883,7 @@ function drawTransparentGrid(ctx: CanvasRenderingContext2D, width: number, heigh
 type CachedImage = {
   element: HTMLImageElement;
   ready: boolean;
+  failed?: boolean;
   promise: Promise<void>;
 };
 
@@ -692,6 +895,20 @@ type CachedVideo = {
 
 const imageCache = new Map<string, CachedImage>();
 const videoCache = new Map<string, CachedVideo>();
+
+type SceneBrollStatus = {
+  status: 'idle' | 'loaded' | 'failed';
+  activeAssetId?: string;
+  activeSource?: string;
+  failedAssetIds: string[];
+  warning?: string;
+};
+
+const brollStatus = new Map<string, SceneBrollStatus>();
+
+export function getSceneBrollStatus(sceneId: string): SceneBrollStatus {
+  return brollStatus.get(sceneId) ?? { status: 'idle', failedAssetIds: [] };
+}
 
 function getBackground(settings: RenderSettings) {
   return settings.background ?? DEFAULT_BACKGROUND;
@@ -727,27 +944,55 @@ function getFittedRect(
   };
 }
 
-function getCachedImage(dataUrl: string) {
-  const cached = imageCache.get(dataUrl);
+function validateCanvasSafeImage(element: HTMLImageElement) {
+  const test = document.createElement('canvas');
+  test.width = 1;
+  test.height = 1;
+  const ctx = test.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+  ctx.drawImage(element, 0, 0, 1, 1);
+  ctx.getImageData(0, 0, 1, 1);
+}
+
+function getCachedImage(source: string, crossOrigin = false, validateCanvas = false) {
+  const key = `${crossOrigin ? 'cors:' : 'local:'}${source}`;
+  const cached = imageCache.get(key);
   if (cached) {
     return cached;
   }
 
   const element = new Image();
+  if (crossOrigin) {
+    element.crossOrigin = 'anonymous';
+    element.referrerPolicy = 'no-referrer';
+  }
   element.decoding = 'async';
   const item: CachedImage = {
     element,
     ready: false,
     promise: new Promise((resolve, reject) => {
       element.onload = () => {
-        item.ready = true;
-        resolve();
+        try {
+          if (validateCanvas) {
+            validateCanvasSafeImage(element);
+          }
+          item.ready = true;
+          resolve();
+        } catch {
+          item.failed = true;
+          reject(new Error('Image cannot be exported because remote CORS headers are not compatible.'));
+        }
       };
-      element.onerror = () => reject(new Error('Unable to load background image.'));
+      element.onerror = () => {
+        item.failed = true;
+        reject(new Error('Unable to load image.'));
+      };
     })
   };
-  element.src = dataUrl;
-  imageCache.set(dataUrl, item);
+  element.src = source;
+  imageCache.set(key, item);
   return item;
 }
 
@@ -802,6 +1047,140 @@ function drawMediaBackground(
 ) {
   const rect = getFittedRect(mediaWidth, mediaHeight, settings.width, settings.height, getBackground(settings).mediaFit);
   ctx.drawImage(media, rect.x, rect.y, rect.width, rect.height);
+}
+
+function applyCameraEase(easing: CameraEasing, progress: number) {
+  if (easing === 'linear') {
+    return clamp(progress, 0, 1);
+  }
+  if (easing === 'easeInOut') {
+    return easeInOut(progress);
+  }
+  return easeOutCubic(progress);
+}
+
+function getOrderedBrollAssets(scene: CaptionScene) {
+  const assets = [...(scene.broll?.assets ?? [])].filter((asset) => asset.imageUrl);
+  const selected = assets.find((asset) => asset.id === scene.broll.selectedAssetId);
+  const remaining = assets
+    .filter((asset) => asset.id !== selected?.id)
+    .sort((a, b) => (a.rank || 99) - (b.rank || 99));
+  return selected ? [selected, ...remaining] : remaining;
+}
+
+function getResolvedBrollAsset(scene: CaptionScene) {
+  const status = getSceneBrollStatus(scene.id);
+  const asset = scene.broll.assets.find((item) => item.id === status.activeAssetId);
+  if (!asset?.imageUrl) {
+    return null;
+  }
+  const image = getCachedImage(asset.imageUrl, true, true);
+  return image.ready ? { asset, image } : null;
+}
+
+function drawVignette(ctx: CanvasRenderingContext2D, settings: RenderSettings, strength: number) {
+  if (strength <= 0) {
+    return;
+  }
+  const radius = Math.max(settings.width, settings.height) * 0.72;
+  const gradient = ctx.createRadialGradient(
+    settings.width / 2,
+    settings.height / 2,
+    radius * 0.18,
+    settings.width / 2,
+    settings.height / 2,
+    radius
+  );
+  gradient.addColorStop(0, 'rgba(0,0,0,0)');
+  gradient.addColorStop(1, `rgba(0,0,0,${clamp(strength, 0, 1)})`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, settings.width, settings.height);
+}
+
+function drawSceneBroll(ctx: CanvasRenderingContext2D, settings: RenderSettings, scene: CaptionScene, localTime: number) {
+  if (!scene.broll.enabled) {
+    return;
+  }
+
+  const resolved = getResolvedBrollAsset(scene);
+  if (!resolved) {
+    return;
+  }
+
+  const { image } = resolved;
+  const rect = getFittedRect(
+    image.element.naturalWidth,
+    image.element.naturalHeight,
+    settings.width,
+    settings.height,
+    scene.broll.fit
+  );
+  const camera = scene.camera;
+  const progress = clamp(localTime / Math.max(0.1, scene.duration), 0, 1);
+  const eased = camera.enabled ? applyCameraEase(camera.easing, progress) : 0;
+  const zoom = camera.enabled ? camera.zoomFrom + (camera.zoomTo - camera.zoomFrom) * eased : 1;
+  const panX = camera.enabled ? (camera.panXFrom + (camera.panXTo - camera.panXFrom) * eased) * settings.width : 0;
+  const panY = camera.enabled ? (camera.panYFrom + (camera.panYTo - camera.panYFrom) * eased) * settings.height : 0;
+
+  ctx.save();
+  ctx.globalAlpha = scene.broll.opacity;
+  if (scene.broll.blur > 0) {
+    ctx.filter = `blur(${scene.broll.blur}px)`;
+  }
+  ctx.translate(settings.width / 2 + panX, settings.height / 2 + panY);
+  ctx.scale(zoom, zoom);
+  ctx.drawImage(
+    image.element,
+    rect.x - settings.width / 2,
+    rect.y - settings.height / 2,
+    rect.width,
+    rect.height
+  );
+  ctx.restore();
+
+  if (scene.broll.darken > 0) {
+    ctx.save();
+    ctx.fillStyle = `rgba(0,0,0,${scene.broll.darken})`;
+    ctx.fillRect(0, 0, settings.width, settings.height);
+    ctx.restore();
+  }
+
+  ctx.save();
+  drawVignette(ctx, settings, scene.broll.vignette);
+  ctx.restore();
+}
+
+async function prepareSceneBroll(scene: CaptionScene) {
+  if (!scene.broll.enabled || scene.broll.assets.length === 0) {
+    brollStatus.set(scene.id, { status: 'idle', failedAssetIds: [] });
+    return;
+  }
+
+  const failedAssetIds: string[] = [];
+  for (const asset of getOrderedBrollAssets(scene)) {
+    const image = getCachedImage(asset.imageUrl, true, true);
+    try {
+      await image.promise;
+      if (image.ready) {
+        brollStatus.set(scene.id, {
+          status: 'loaded',
+          activeAssetId: asset.id,
+          activeSource: asset.source,
+          failedAssetIds,
+          warning: failedAssetIds.length > 0 ? `Using fallback ${asset.source || asset.id}; earlier B-roll image failed.` : ''
+        });
+        return;
+      }
+    } catch {
+      failedAssetIds.push(asset.id);
+    }
+  }
+
+  brollStatus.set(scene.id, {
+    status: 'failed',
+    failedAssetIds,
+    warning: 'All B-roll image URLs failed or are not canvas-export safe.'
+  });
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, settings: RenderSettings, time: number, preview = false) {
@@ -1339,6 +1718,183 @@ function drawSceneBackdrop(ctx: CanvasRenderingContext2D, settings: RenderSettin
   ctx.restore();
 }
 
+function getTransitionAmount(scene: CaptionScene, localTime: number) {
+  const transitionIn = scene.transitionIn;
+  const transitionOut = scene.transitionOut;
+  const inDuration = Math.max(0, transitionIn.duration);
+  const outDuration = Math.max(0, transitionOut.duration);
+  const inAmount =
+    transitionIn.type !== 'none' && inDuration > 0 && localTime < inDuration
+      ? 1 - easeOutCubic(localTime / inDuration)
+      : 0;
+  const outStart = Math.max(0, scene.duration - outDuration);
+  const outAmount =
+    transitionOut.type !== 'none' && outDuration > 0 && localTime > outStart
+      ? easeInOut((localTime - outStart) / outDuration)
+      : 0;
+  return outAmount >= inAmount
+    ? { transition: transitionOut, amount: outAmount, phase: 'out' as const }
+    : { transition: transitionIn, amount: inAmount, phase: 'in' as const };
+}
+
+function getDirectionOffset(direction: SceneTransitionDirection | undefined, settings: RenderSettings, amount: number) {
+  const distance = Math.min(settings.width, settings.height) * 0.12 * amount;
+  if (direction === 'right') {
+    return { x: distance, y: 0 };
+  }
+  if (direction === 'up') {
+    return { x: 0, y: -distance };
+  }
+  if (direction === 'down') {
+    return { x: 0, y: distance };
+  }
+  return { x: -distance, y: 0 };
+}
+
+function applySceneTransition(ctx: CanvasRenderingContext2D, settings: RenderSettings, scene: CaptionScene, localTime: number) {
+  const { transition, amount, phase } = getTransitionAmount(scene, localTime);
+  const t = clamp(amount, 0, 1);
+  if (t <= 0 || transition.type === 'none') {
+    return 0;
+  }
+
+  if (transition.type === 'fade') {
+    ctx.globalAlpha *= 1 - t;
+  } else if (transition.type === 'zoom') {
+    const scale = phase === 'in' ? 1 - t * 0.08 : 1 + t * 0.1;
+    ctx.translate(settings.width / 2, settings.height / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-settings.width / 2, -settings.height / 2);
+    ctx.globalAlpha *= 1 - t * 0.16;
+  } else if (transition.type === 'slide') {
+    const offset = getDirectionOffset(transition.direction, settings, t);
+    ctx.translate(offset.x, offset.y);
+    ctx.globalAlpha *= 1 - t * 0.1;
+  } else if (transition.type === 'blur') {
+    ctx.filter = `blur(${Math.round(t * 18)}px)`;
+    ctx.globalAlpha *= 1 - t * 0.18;
+  }
+
+  return transition.type === 'flash' ? t * 0.72 : 0;
+}
+
+function drawTransitionFlash(ctx: CanvasRenderingContext2D, settings: RenderSettings, alpha: number) {
+  if (alpha <= 0) {
+    return;
+  }
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, settings.width, settings.height);
+  ctx.restore();
+}
+
+function getGraphicAlpha(graphic: SceneGraphic, localTime: number) {
+  if (localTime < graphic.start || localTime > graphic.end) {
+    return 0;
+  }
+  const intro = easeOutCubic((localTime - graphic.start) / 0.28);
+  const outro = 1 - easeInOut((localTime - (graphic.end - 0.22)) / 0.22);
+  return clamp(intro * outro, 0, 1);
+}
+
+function applyGraphicAnimation(ctx: CanvasRenderingContext2D, graphic: SceneGraphic, alpha: number, localTime: number, settings: RenderSettings) {
+  const intro = easeOutCubic((localTime - graphic.start) / 0.32);
+  if (graphic.animation === 'pop') {
+    const scale = 0.82 + intro * 0.18;
+    ctx.scale(scale, scale);
+  } else if (graphic.animation === 'slide') {
+    ctx.translate(0, (1 - intro) * settings.height * 0.035);
+  } else if (graphic.animation === 'draw') {
+    ctx.globalAlpha *= Math.min(alpha, intro);
+  }
+}
+
+function drawSceneGraphic(ctx: CanvasRenderingContext2D, settings: RenderSettings, graphic: SceneGraphic, localTime: number) {
+  const alpha = getGraphicAlpha(graphic, localTime);
+  if (alpha <= 0) {
+    return;
+  }
+
+  const x = graphic.x * settings.width;
+  const y = graphic.y * settings.height;
+  const baseSize = Math.min(settings.width, settings.height);
+  const fontSize = Math.max(22, baseSize * 0.042);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  applyGraphicAnimation(ctx, graphic, alpha, localTime, settings);
+  ctx.fillStyle = graphic.color;
+  ctx.strokeStyle = graphic.color;
+  ctx.lineWidth = Math.max(5, baseSize * 0.006);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (graphic.type === 'arrow') {
+    const width = baseSize * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(-width / 2, 0);
+    ctx.lineTo(width / 2, 0);
+    ctx.lineTo(width / 2 - baseSize * 0.035, -baseSize * 0.035);
+    ctx.moveTo(width / 2, 0);
+    ctx.lineTo(width / 2 - baseSize * 0.035, baseSize * 0.035);
+    ctx.stroke();
+  } else if (graphic.type === 'circle') {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, baseSize * 0.16, baseSize * 0.075, -0.08, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (graphic.type === 'underline') {
+    ctx.beginPath();
+    ctx.moveTo(-baseSize * 0.18, 0);
+    ctx.quadraticCurveTo(0, baseSize * 0.025, baseSize * 0.18, 0);
+    ctx.stroke();
+  } else if (graphic.type === 'stat-card') {
+    const width = settings.width * 0.42;
+    const height = Math.max(110, baseSize * 0.16);
+    ctx.fillStyle = 'rgba(10, 12, 16, 0.82)';
+    ctx.strokeStyle = graphic.color;
+    roundRect(ctx, -width / 2, -height / 2, width, height, 22);
+    ctx.fill();
+    ctx.stroke();
+    ctx.font = `900 ${fontSize * 1.2}px ${DEFAULT_FONT.family}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = graphic.color;
+    ctx.fillText(graphic.value || '72%', 0, -height * 0.12);
+    ctx.font = `800 ${fontSize * 0.55}px ${DEFAULT_FONT.family}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.84)';
+    ctx.fillText(graphic.text || 'Retention', 0, height * 0.26);
+  } else if (graphic.type === 'quote-card') {
+    const width = settings.width * 0.58;
+    const height = Math.max(120, baseSize * 0.18);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    roundRect(ctx, -width / 2, -height / 2, width, height, 18);
+    ctx.fill();
+    ctx.font = `800 ${fontSize * 0.62}px ${DEFAULT_FONT.family}`;
+    ctx.fillStyle = '#111318';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(graphic.text || 'Key quote', 0, 0);
+  } else {
+    const text = graphic.text || 'Common Mistake';
+    ctx.font = `900 ${fontSize * 0.68}px ${DEFAULT_FONT.family}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = Math.max(ctx.measureText(text).width + fontSize, settings.width * 0.24);
+    const height = fontSize * 1.15;
+    ctx.fillStyle = graphic.color;
+    roundRect(ctx, -width / 2, -height / 2, width, height, height * 0.2);
+    ctx.fill();
+    ctx.fillStyle = '#111318';
+    ctx.fillText(text, 0, 0);
+  }
+  ctx.restore();
+}
+
+function drawSceneGraphics(ctx: CanvasRenderingContext2D, settings: RenderSettings, scene: CaptionScene, localTime: number) {
+  scene.graphics.forEach((graphic) => drawSceneGraphic(ctx, settings, graphic, localTime));
+}
+
 function drawWatermark(ctx: CanvasRenderingContext2D, settings: RenderSettings) {
   if (!settings.brand.watermarkEnabled || !settings.brand.watermark.trim()) {
     return;
@@ -1377,8 +1933,14 @@ export function renderFrame(
   const fontSize = prepareContext(ctx, settings, scene);
   const words = layoutWords(ctx, settings, scene, Math.max(0, localTime - 0.04));
 
+  ctx.save();
+  const flashAlpha = applySceneTransition(ctx, settings, scene, localTime);
+  drawSceneBroll(ctx, settings, scene, localTime);
+  drawSceneGraphics(ctx, settings, scene, localTime);
   drawSceneBackdrop(ctx, settings, scene, localTime);
   words.forEach((word) => drawWord(ctx, word, settings, scene, Math.max(0, localTime - 0.04), fontSize));
+  ctx.restore();
+  drawTransitionFlash(ctx, settings, flashAlpha);
   drawWatermark(ctx, settings);
 
   if (options.preview && options.guides) {
@@ -1393,6 +1955,8 @@ export async function renderFrameAsync(
   options: { preview?: boolean; guides?: boolean } = {}
 ) {
   await prepareBackground(settings, time, Boolean(options.preview));
+  const { scene } = getActiveScene(settings, time);
+  await prepareSceneBroll(scene);
   renderFrame(canvas, settings, time, options);
 }
 

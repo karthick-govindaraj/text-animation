@@ -488,6 +488,56 @@ select:focus {
   min-height: 18px;
 }
 
+.visual-status {
+  display: grid;
+  gap: 2px;
+  margin-top: 5px;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.visual-status small {
+  overflow: hidden;
+  color: #ffcf8a;
+  font-size: 9px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-section {
+  break-inside: avoid;
+}
+
+.broll-assets,
+.graphics-editor {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.broll-asset-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 4px;
+}
+
+.graphic-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr) 24px 42px 42px 18px;
+  gap: 3px;
+  align-items: center;
+}
+
+.graphic-row input[type='color'] {
+  min-height: 20px;
+}
+
 .mini-button {
   min-height: 18px;
   border: 1px solid var(--line);

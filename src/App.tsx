@@ -33,6 +33,7 @@ import {
   AspectRatio,
   AudioSettings,
   BackgroundSettings,
+  BrollAssetCandidate,
   BrandKit,
   CaptionScene,
   DEFAULT_AUDIO,
@@ -42,9 +43,12 @@ import {
   FONT_FAMILIES,
   FontControls,
   HighlightShape,
+  SceneGraphic,
   SCENE_TEMPLATES,
   STYLE_PRESETS,
   SafeAreaPreset,
+  SceneTransitionDirection,
+  SceneTransitionType,
   TextColorMode,
   TextAlign,
   canvasToPng,
@@ -53,6 +57,7 @@ import {
   getActiveScene,
   getAspectSize,
   getFrameCount,
+  getSceneBrollStatus,
   getTotalDuration,
   normalizeText,
   renderFrameAsync
@@ -63,14 +68,15 @@ type ExportKind = 'mp4' | 'webm-alpha' | 'mov-alpha';
 
 const FF_VERSION = '0.12.10';
 const FONT_STORAGE_KEY = 'kinetic-text-font-controls';
-const PROJECT_FILE_VERSION = 1;
+const PROJECT_FILE_VERSION = 2;
 const IMAGE_LIMIT_BYTES = 10 * 1024 * 1024;
 const VIDEO_LIMIT_BYTES = 25 * 1024 * 1024;
 
 type ProjectSceneV1 = Omit<CaptionScene, 'typographyStyle'>;
 
 type ProjectFileV1 = {
-  version: 1;
+  version: 1 | 2;
+  schema?: 'scene-premium-v2';
   createdAt: string;
   scenes: ProjectSceneV1[];
   aspect: AspectRatio;
@@ -180,6 +186,9 @@ export default function App() {
   const frameCount = getFrameCount(settings);
   const previewScene = getActiveScene(settings, Math.min(playhead, Math.max(0, duration - 0.01)));
   const activeSceneWords = useMemo(() => normalizeText(activeScene?.text ?? '').split(' ').filter(Boolean), [activeScene?.text]);
+  const activeBrollStatus = activeScene
+    ? getSceneBrollStatus(activeScene.id)
+    : { status: 'idle' as const, failedAssetIds: [], activeSource: '', warning: '' };
 
   useEffect(() => {
     const firstScene = scenes[0];
@@ -388,6 +397,70 @@ export default function App() {
         return { ...scene, wordColors: nextWordColors };
       })
     );
+  };
+
+  const updateActiveSceneBroll = (patch: Partial<CaptionScene['broll']>) => {
+    if (!activeScene) {
+      return;
+    }
+    updateScene(activeScene.id, { broll: { ...activeScene.broll, ...patch } });
+  };
+
+  const updateActiveBrollAsset = (index: number, patch: Partial<BrollAssetCandidate>) => {
+    if (!activeScene) {
+      return;
+    }
+    const assets = [...activeScene.broll.assets];
+    const current = assets[index] ?? {
+      id: `broll-${index + 1}`,
+      rank: index + 1,
+      source: index === 0 ? 'Pexels' : index === 1 ? 'Unsplash' : 'Pixabay',
+      title: '',
+      imageUrl: '',
+      pageUrl: '',
+      license: '',
+      relevanceScore: 0.8
+    };
+    assets[index] = { ...current, ...patch, rank: index + 1 };
+    updateActiveSceneBroll({
+      assets,
+      selectedAssetId: activeScene.broll.selectedAssetId || assets[0]?.id || ''
+    });
+  };
+
+  const addSceneGraphic = () => {
+    if (!activeScene) {
+      return;
+    }
+    const graphic: SceneGraphic = {
+      id: crypto.randomUUID(),
+      type: 'warning-label',
+      start: 0.25,
+      end: Math.min(activeScene.duration, 2.8),
+      x: 0.5,
+      y: 0.22,
+      text: 'Common Mistake',
+      value: '',
+      color: activeScene.accent,
+      animation: 'pop'
+    };
+    updateScene(activeScene.id, { graphics: [...activeScene.graphics, graphic] });
+  };
+
+  const updateSceneGraphic = (graphicId: string, patch: Partial<SceneGraphic>) => {
+    if (!activeScene) {
+      return;
+    }
+    updateScene(activeScene.id, {
+      graphics: activeScene.graphics.map((graphic) => (graphic.id === graphicId ? { ...graphic, ...patch } : graphic))
+    });
+  };
+
+  const deleteSceneGraphic = (graphicId: string) => {
+    if (!activeScene) {
+      return;
+    }
+    updateScene(activeScene.id, { graphics: activeScene.graphics.filter((graphic) => graphic.id !== graphicId) });
   };
 
   const addScene = () => {
@@ -608,6 +681,7 @@ export default function App() {
   const exportProjectFile = () => {
     const project: ProjectFileV1 = {
       version: PROJECT_FILE_VERSION,
+      schema: 'scene-premium-v2',
       createdAt: new Date().toISOString(),
       scenes: scenes.map(serializeSceneForProject),
       aspect,
@@ -629,7 +703,7 @@ export default function App() {
 
     try {
       const project = JSON.parse(await file.text()) as Partial<ProjectFileV1>;
-      if (project.version !== PROJECT_FILE_VERSION || !Array.isArray(project.scenes) || project.scenes.length === 0) {
+      if ((project.version !== 1 && project.version !== PROJECT_FILE_VERSION) || !Array.isArray(project.scenes) || project.scenes.length === 0) {
         throw new Error('Unsupported or invalid project file.');
       }
 
@@ -725,6 +799,14 @@ export default function App() {
             </div>
           </div>
           <div className="topbar-actions">
+            <button className="ghost-button" onClick={exportProjectFile}>
+              <Download size={18} />
+              Export JSON
+            </button>
+            <button className="ghost-button" onClick={() => projectInputRef.current?.click()}>
+              <FolderOpen size={18} />
+              Import JSON
+            </button>
             <button className="ghost-button" onClick={togglePlayback}>
               {isPlaying ? <Pause size={18} /> : <Play size={18} />}
               {isPlaying ? 'Pause' : 'Play'}
@@ -928,6 +1010,197 @@ export default function App() {
                   </label>
                 </div>
               </>
+            )}
+            {activeScene && (
+              <div className="visual-section">
+                <div className="panel-divider" />
+                <div className="panel-heading">
+                  <Image size={18} />
+                  <span>Scene Visuals</span>
+                </div>
+                <label className="toggle-row">
+                  <input
+                    type="checkbox"
+                    checked={activeScene.broll.enabled}
+                    onChange={(event) => updateActiveSceneBroll({ enabled: event.target.checked })}
+                  />
+                  Enable image B-roll
+                </label>
+                <div className="visual-status">
+                  <span>{activeBrollStatus.status === 'loaded' ? `B-roll: ${activeBrollStatus.activeSource}` : `B-roll: ${activeBrollStatus.status}`}</span>
+                  {activeBrollStatus.warning && <small>{activeBrollStatus.warning}</small>}
+                </div>
+                <div className="field-grid">
+                  <label>
+                    Intent
+                    <select value={activeScene.intent ?? 'hook'} onChange={(event) => updateScene(activeScene.id, { intent: event.target.value as CaptionScene['intent'] })}>
+                      {(['hook', 'proof', 'warning', 'reveal', 'example', 'cta'] as NonNullable<CaptionScene['intent']>[]).map((intent) => (
+                        <option key={intent} value={intent}>
+                          {intent}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Intensity <strong>{Math.round((activeScene.visualIntensity ?? 0.5) * 100)}%</strong>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={activeScene.visualIntensity ?? 0.5}
+                      onChange={(event) => updateScene(activeScene.id, { visualIntensity: Number(event.target.value) })}
+                    />
+                  </label>
+                </div>
+                <div className="field-row">
+                  <label>B-roll Query</label>
+                  <input value={activeScene.broll.query} onChange={(event) => updateActiveSceneBroll({ query: event.target.value })} />
+                </div>
+                <div className="field-row">
+                  <label>B-roll Purpose</label>
+                  <input value={activeScene.broll.purpose} onChange={(event) => updateActiveSceneBroll({ purpose: event.target.value })} />
+                </div>
+                <div className="broll-assets">
+                  {[0, 1, 2].map((index) => {
+                    const asset = activeScene.broll.assets[index];
+                    return (
+                      <div className="broll-asset-row" key={`broll-${index}`}>
+                        <select
+                          value={asset?.source ?? (index === 0 ? 'Pexels' : index === 1 ? 'Unsplash' : 'Pixabay')}
+                          onChange={(event) => updateActiveBrollAsset(index, { source: event.target.value })}
+                        >
+                          <option value="Pexels">Pexels</option>
+                          <option value="Unsplash">Unsplash</option>
+                          <option value="Pixabay">Pixabay</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        <input
+                          placeholder={`Rank ${index + 1} image URL`}
+                          value={asset?.imageUrl ?? ''}
+                          onChange={(event) =>
+                            updateActiveBrollAsset(index, {
+                              id: asset?.id || `broll-${index + 1}`,
+                              title: asset?.title || `B-roll ${index + 1}`,
+                              imageUrl: event.target.value
+                            })
+                          }
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="field-grid">
+                  <label>
+                    Fit
+                    <select value={activeScene.broll.fit} onChange={(event) => updateActiveSceneBroll({ fit: event.target.value as CaptionScene['broll']['fit'] })}>
+                      <option value="cover">Cover</option>
+                      <option value="contain">Contain</option>
+                      <option value="stretch">Stretch</option>
+                    </select>
+                  </label>
+                  <label>
+                    Opacity <strong>{Math.round(activeScene.broll.opacity * 100)}%</strong>
+                    <input type="range" min="0" max="1" step="0.05" value={activeScene.broll.opacity} onChange={(event) => updateActiveSceneBroll({ opacity: Number(event.target.value) })} />
+                  </label>
+                  <label>
+                    Darken <strong>{Math.round(activeScene.broll.darken * 100)}%</strong>
+                    <input type="range" min="0" max="1" step="0.05" value={activeScene.broll.darken} onChange={(event) => updateActiveSceneBroll({ darken: Number(event.target.value) })} />
+                  </label>
+                  <label>
+                    Blur <strong>{activeScene.broll.blur}px</strong>
+                    <input type="range" min="0" max="40" step="1" value={activeScene.broll.blur} onChange={(event) => updateActiveSceneBroll({ blur: Number(event.target.value) })} />
+                  </label>
+                  <label>
+                    Vignette <strong>{Math.round(activeScene.broll.vignette * 100)}%</strong>
+                    <input type="range" min="0" max="1" step="0.05" value={activeScene.broll.vignette} onChange={(event) => updateActiveSceneBroll({ vignette: Number(event.target.value) })} />
+                  </label>
+                </div>
+                <div className="field-grid">
+                  <label className="toggle-field wide">
+                    <input
+                      type="checkbox"
+                      checked={activeScene.camera.enabled}
+                      onChange={(event) => updateScene(activeScene.id, { camera: { ...activeScene.camera, enabled: event.target.checked } })}
+                    />
+                    Ken Burns camera
+                  </label>
+                  <label>
+                    Zoom In
+                    <input type="number" min="0.25" max="4" step="0.01" value={activeScene.camera.zoomFrom} onChange={(event) => updateScene(activeScene.id, { camera: { ...activeScene.camera, zoomFrom: Number(event.target.value) } })} />
+                  </label>
+                  <label>
+                    Zoom Out
+                    <input type="number" min="0.25" max="4" step="0.01" value={activeScene.camera.zoomTo} onChange={(event) => updateScene(activeScene.id, { camera: { ...activeScene.camera, zoomTo: Number(event.target.value) } })} />
+                  </label>
+                  <label>
+                    Pan X To
+                    <input type="number" min="-1" max="1" step="0.01" value={activeScene.camera.panXTo} onChange={(event) => updateScene(activeScene.id, { camera: { ...activeScene.camera, panXTo: Number(event.target.value) } })} />
+                  </label>
+                  <label>
+                    Pan Y To
+                    <input type="number" min="-1" max="1" step="0.01" value={activeScene.camera.panYTo} onChange={(event) => updateScene(activeScene.id, { camera: { ...activeScene.camera, panYTo: Number(event.target.value) } })} />
+                  </label>
+                  <label>
+                    Ease
+                    <select value={activeScene.camera.easing} onChange={(event) => updateScene(activeScene.id, { camera: { ...activeScene.camera, easing: event.target.value as CaptionScene['camera']['easing'] } })}>
+                      <option value="easeOutCubic">Ease Out</option>
+                      <option value="easeInOut">Ease In Out</option>
+                      <option value="linear">Linear</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="field-grid">
+                  <label>
+                    In
+                    <select value={activeScene.transitionIn.type} onChange={(event) => updateScene(activeScene.id, { transitionIn: { ...activeScene.transitionIn, type: event.target.value as SceneTransitionType } })}>
+                      {(['none', 'fade', 'zoom', 'slide', 'blur', 'flash'] as SceneTransitionType[]).map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    In Dur
+                    <input type="number" min="0" max="3" step="0.05" value={activeScene.transitionIn.duration} onChange={(event) => updateScene(activeScene.id, { transitionIn: { ...activeScene.transitionIn, duration: Number(event.target.value) } })} />
+                  </label>
+                  <label>
+                    Out
+                    <select value={activeScene.transitionOut.type} onChange={(event) => updateScene(activeScene.id, { transitionOut: { ...activeScene.transitionOut, type: event.target.value as SceneTransitionType } })}>
+                      {(['none', 'fade', 'zoom', 'slide', 'blur', 'flash'] as SceneTransitionType[]).map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Direction
+                    <select value={activeScene.transitionIn.direction ?? 'left'} onChange={(event) => updateScene(activeScene.id, { transitionIn: { ...activeScene.transitionIn, direction: event.target.value as SceneTransitionDirection }, transitionOut: { ...activeScene.transitionOut, direction: event.target.value as SceneTransitionDirection } })}>
+                      {(['left', 'right', 'up', 'down'] as SceneTransitionDirection[]).map((direction) => (
+                        <option key={direction} value={direction}>{direction}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="graphics-editor">
+                  <button className="ghost-button full" onClick={addSceneGraphic}>
+                    <Plus size={16} />
+                    Add Graphic
+                  </button>
+                  {activeScene.graphics.map((graphic) => (
+                    <div className="graphic-row" key={graphic.id}>
+                      <select value={graphic.type} onChange={(event) => updateSceneGraphic(graphic.id, { type: event.target.value as SceneGraphic['type'] })}>
+                        {(['arrow', 'circle', 'underline', 'stat-card', 'warning-label', 'quote-card'] as SceneGraphic['type'][]).map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                      <input value={graphic.text ?? ''} placeholder="Text" onChange={(event) => updateSceneGraphic(graphic.id, { text: event.target.value })} />
+                      <input type="color" value={graphic.color} onChange={(event) => updateSceneGraphic(graphic.id, { color: event.target.value })} />
+                      <input type="number" min="0" max={activeScene.duration} step="0.1" value={graphic.start} onChange={(event) => updateSceneGraphic(graphic.id, { start: Number(event.target.value) })} />
+                      <input type="number" min="0" max={activeScene.duration} step="0.1" value={graphic.end} onChange={(event) => updateSceneGraphic(graphic.id, { end: Number(event.target.value) })} />
+                      <button className="mini-button" onClick={() => deleteSceneGraphic(graphic.id)} title="Delete graphic">Delete</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
             <div className="panel-divider" />
             <div className="panel-heading">
