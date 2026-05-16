@@ -956,6 +956,10 @@ function validateCanvasSafeImage(element: HTMLImageElement) {
   ctx.getImageData(0, 0, 1, 1);
 }
 
+function createTimeoutError(message: string) {
+  return new Error(message);
+}
+
 function getCachedImage(source: string, crossOrigin = false, validateCanvas = false) {
   const key = `${crossOrigin ? 'cors:' : 'local:'}${source}`;
   const cached = imageCache.get(key);
@@ -973,7 +977,12 @@ function getCachedImage(source: string, crossOrigin = false, validateCanvas = fa
     element,
     ready: false,
     promise: new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        item.failed = true;
+        reject(createTimeoutError('Image load timed out.'));
+      }, 6000);
       element.onload = () => {
+        window.clearTimeout(timeout);
         try {
           if (validateCanvas) {
             validateCanvasSafeImage(element);
@@ -986,6 +995,7 @@ function getCachedImage(source: string, crossOrigin = false, validateCanvas = fa
         }
       };
       element.onerror = () => {
+        window.clearTimeout(timeout);
         item.failed = true;
         reject(new Error('Unable to load image.'));
       };

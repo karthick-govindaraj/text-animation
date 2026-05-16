@@ -29,6 +29,21 @@ import {
   renderProjectAudio,
   startHowlerPreviewAudio
 } from './audio';
+import { isDesktopApp, openProjectJsonFromDesktop, saveProjectJsonToDesktop, selectMp4OutputPath } from './desktop';
+import {
+  checkNativeFfmpegAvailable,
+  cleanupNativeFrameDirectory,
+  createNativeFrameDirectory,
+  runBackendSceneExport,
+  runNativeFfmpegExport,
+  startNativeExport,
+  writeNativeJpegFrame
+} from './nativeExport';
+import {
+  buildNativeRenderProject,
+  getNativeRendererWarnings,
+  requestNativePreviewFrame,
+} from './nativeRenderer';
 import {
   AspectRatio,
   AudioSettings,
@@ -102,6 +117,37 @@ function filePrefix() {
   return `kinetic-text-${Date.now()}`;
 }
 
+function withExportTimeout<T>(task: Promise<T>, timeoutMs: number, message: string) {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([task, timeout]).finally(() => {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  });
+}
+
+function canvasToJpeg(canvas: HTMLCanvasElement, quality = 0.92) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('Unable to create JPEG frame.'));
+      }
+    }, 'image/jpeg', quality);
+  });
+}
+
+function parentPath(path: string) {
+  const normalized = path.replace(/\\/g, '/');
+  const index = normalized.lastIndexOf('/');
+  return index > 0 ? normalized.slice(0, index) : '.';
+}
+
 async function waitForFonts() {
   if ('fonts' in document) {
     await document.fonts.ready;
@@ -121,6 +167,45 @@ function serializeSceneForProject(scene: CaptionScene): ProjectSceneV1 {
   const projectScene = { ...scene } as Partial<CaptionScene>;
   delete projectScene.typographyStyle;
   return projectScene as ProjectSceneV1;
+}
+
+function parseProjectFile(contents: string) {
+  let project: Partial<ProjectFileV1>;
+  try {
+    project = JSON.parse(contents) as Partial<ProjectFileV1>;
+  } catch {
+    throw new Error('Project import failed: file is not valid JSON.');
+  }
+
+  if (!project || typeof project !== 'object' || Array.isArray(project)) {
+    throw new Error('Project import failed: root value must be an object.');
+  }
+
+  if (project.version !== 1 && project.version !== PROJECT_FILE_VERSION) {
+    throw new Error(`Project import failed: unsupported version "${String(project.version)}".`);
+  }
+
+  if (!Array.isArray(project.scenes)) {
+    throw new Error('Project import failed: "scenes" must be an array.');
+  }
+
+  if (project.scenes.length === 0) {
+    throw new Error('Project import failed: project must contain at least one scene.');
+  }
+
+  project.scenes.forEach((scene, index) => {
+    if (!scene || typeof scene !== 'object') {
+      throw new Error(`Project import failed: scenes[${index}] must be an object.`);
+    }
+    if (typeof scene.text !== 'string' || !scene.text.trim()) {
+      throw new Error(`Project import failed: scenes[${index}].text is required.`);
+    }
+    if (scene.duration !== undefined && (!Number.isFinite(Number(scene.duration)) || Number(scene.duration) <= 0)) {
+      throw new Error(`Project import failed: scenes[${index}].duration must be greater than 0.`);
+    }
+  });
+
+  return project;
 }
 
 function clampNumber(value: number, min: number, max: number) {
@@ -155,12 +240,18 @@ export default function App() {
   const [audio, setAudio] = useState<AudioSettings>(DEFAULT_AUDIO);
   const [voicePreviewEnabled, setVoicePreviewEnabled] = useState(false);
   const [voicePreviewName, setVoicePreviewName] = useState('');
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [exportLabel, setExportLabel] = useState('');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
+  const [nativeFfmpegStatus, setNativeFfmpegStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
+  const [nativeFfmpegMessage, setNativeFfmpegMessage] = useState('');
+  const [previewMode, setPreviewMode] = useState<'browser' | 'native'>(isDesktopApp() ? 'native' : 'browser');
+  const [nativePreviewUrl, setNativePreviewUrl] = useState('');
+  const [nativePreviewError, setNativePreviewError] = useState('');
+  const nativePreviewUrlRef = useRef('');
 
   const size = getAspectSize(aspect);
   const duration = useMemo(() => getTotalDuration(scenes), [scenes]);
@@ -189,6 +280,11 @@ export default function App() {
   const activeBrollStatus = activeScene
     ? getSceneBrollStatus(activeScene.id)
     : { status: 'idle' as const, failedAssetIds: [], activeSource: '', warning: '' };
+  const nativeProject = useMemo(
+    () => buildNativeRenderProject(scenes, size.width, size.height, fps, duration, font, safeArea),
+    [scenes, size.width, size.height, fps, duration, font, safeArea]
+  );
+  const nativeWarnings = useMemo(() => getNativeRendererWarnings(font), [font]);
 
   useEffect(() => {
     const firstScene = scenes[0];
@@ -214,7 +310,7 @@ export default function App() {
 
   useEffect(() => {
     const canvas = previewRef.current;
-    if (!canvas) {
+    if (!canvas || previewMode !== 'browser') {
       return;
     }
 
@@ -242,15 +338,73 @@ export default function App() {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [duration, isPlaying, settings, showGuides]);
+  }, [duration, isPlaying, previewMode, settings, showGuides]);
 
   useEffect(() => {
+    if (previewMode !== 'browser') {
+      return;
+    }
     pausedAtRef.current = Math.min(pausedAtRef.current, Math.max(0, duration - 0.01));
     const canvas = previewRef.current;
     if (canvas) {
       void renderFrameAsync(canvas, settings, pausedAtRef.current, { preview: true, guides: showGuides });
     }
-  }, [duration, settings, showGuides]);
+  }, [duration, previewMode, settings, showGuides]);
+
+  // Native preview rendering effect
+  useEffect(() => {
+    if (previewMode !== 'native') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const renderNative = async (time: number) => {
+      try {
+        setNativePreviewError('');
+        const url = await requestNativePreviewFrame(nativeProject, time);
+        if (!cancelled && url) {
+          // Revoke previous blob URL
+          if (nativePreviewUrlRef.current) {
+            URL.revokeObjectURL(nativePreviewUrlRef.current);
+          }
+          nativePreviewUrlRef.current = url;
+          setNativePreviewUrl(url);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setNativePreviewError(err instanceof Error ? err.message : 'Native render failed');
+        }
+      }
+    };
+
+    if (isPlaying) {
+      let animFrame: number;
+      const tick = (now: number) => {
+        if (cancelled) return;
+        if (startRef.current === 0) {
+          startRef.current = now - pausedAtRef.current * 1000;
+        }
+        const nextTime = duration > 0 ? ((now - startRef.current) / 1000) % duration : 0;
+        pausedAtRef.current = nextTime;
+        setPlayhead(nextTime);
+        syncVoicePreviewTime(nextTime, false, true);
+        void renderNative(nextTime);
+        animFrame = requestAnimationFrame(tick);
+      };
+      animFrame = requestAnimationFrame(tick);
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(animFrame);
+      };
+    } else {
+      startRef.current = 0;
+      void renderNative(pausedAtRef.current);
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [duration, isPlaying, nativeProject, previewMode]);
 
   useEffect(() => {
     if (isPlaying && audio.enabled) {
@@ -268,9 +422,37 @@ export default function App() {
     }
   }, [voicePreviewEnabled, voicePreviewName]);
 
+  useEffect(() => {
+    if (!isDesktopApp()) {
+      return;
+    }
+
+    void refreshNativeFfmpegStatus();
+  }, []);
+
   const stopAudioPreview = () => {
     stopAudioRef.current?.();
     stopAudioRef.current = null;
+  };
+
+  const refreshNativeFfmpegStatus = async () => {
+    setNativeFfmpegStatus('checking');
+    setNativeFfmpegMessage('');
+
+    try {
+      const result = await checkNativeFfmpegAvailable();
+      if (result.available) {
+        setNativeFfmpegStatus('available');
+        setNativeFfmpegMessage(result.version ?? 'Native FFmpeg is available.');
+        return;
+      }
+
+      setNativeFfmpegStatus('unavailable');
+      setNativeFfmpegMessage(result.error ?? 'FFmpeg was not found on the desktop runtime path.');
+    } catch (cause) {
+      setNativeFfmpegStatus('unavailable');
+      setNativeFfmpegMessage(cause instanceof Error ? cause.message : 'Native FFmpeg availability check failed.');
+    }
   };
 
   const stopVoicePreview = () => {
@@ -519,9 +701,23 @@ export default function App() {
     setPlayhead(next);
     pausePreview();
     syncVoicePreviewTime(next, true, false);
-    const canvas = previewRef.current;
-    if (canvas) {
-      void renderFrameAsync(canvas, settings, next, { preview: true, guides: showGuides });
+    if (previewMode === 'browser') {
+      const canvas = previewRef.current;
+      if (canvas) {
+        void renderFrameAsync(canvas, settings, next, { preview: true, guides: showGuides });
+      }
+    } else {
+      void requestNativePreviewFrame(nativeProject, next).then((url) => {
+        if (url) {
+          if (nativePreviewUrlRef.current) {
+            URL.revokeObjectURL(nativePreviewUrlRef.current);
+          }
+          nativePreviewUrlRef.current = url;
+          setNativePreviewUrl(url);
+        }
+      }).catch((err) => {
+        setNativePreviewError(err instanceof Error ? err.message : 'Native render failed');
+      });
     }
   };
 
@@ -563,9 +759,21 @@ export default function App() {
     for (let frame = 0; frame < frameCount; frame += 1) {
       const name = `frame_${String(frame + 1).padStart(4, '0')}.png`;
       const time = frame / fps;
-      await renderFrameAsync(canvas, settings, time, { preview: false });
-      const blob = await canvasToPng(canvas);
-      await ffmpeg.writeFile(name, await fetchFile(blob));
+      await withExportTimeout(
+        renderFrameAsync(canvas, settings, time, { preview: false }),
+        15000,
+        `Frame render timed out at ${frame + 1}/${frameCount}. Check remote image URLs or reduce image effects.`
+      );
+      const blob = await withExportTimeout(
+        canvasToPng(canvas),
+        10000,
+        `PNG conversion timed out at frame ${frame + 1}/${frameCount}.`
+      );
+      await withExportTimeout(
+        (async () => ffmpeg.writeFile(name, await fetchFile(blob)))(),
+        15000,
+        `FFmpeg frame write timed out at ${frame + 1}/${frameCount}.`
+      );
       names.push(name);
       setProgress(Math.round((frame / frameCount) * 45));
       setExportLabel(`Rendering MOV frames ${frame + 1}/${frameCount}`);
@@ -573,9 +781,195 @@ export default function App() {
     return names;
   };
 
+  const writeNativeFrames = async (frameDir: string, canvas: HTMLCanvasElement) => {
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      const time = frame / fps;
+      await withExportTimeout(
+        renderFrameAsync(canvas, settings, time, { preview: false }),
+        15000,
+        `Frame render timed out at ${frame + 1}/${frameCount}. Check remote B-roll image URLs or reduce image effects.`
+      );
+      const blob = await withExportTimeout(
+        canvasToJpeg(canvas),
+        10000,
+        `JPEG conversion timed out at frame ${frame + 1}/${frameCount}.`
+      );
+      const buffer = await withExportTimeout(
+        blob.arrayBuffer(),
+        10000,
+        `JPEG buffer conversion timed out at frame ${frame + 1}/${frameCount}.`
+      );
+      const bytes = new Uint8Array(buffer);
+      await withExportTimeout(
+        writeNativeJpegFrame(frameDir, frame, bytes),
+        15000,
+        `Native frame write timed out at ${frame + 1}/${frameCount}.`
+      );
+      setProgress(Math.round((frame / Math.max(frameCount, 1)) * 70));
+      setExportLabel(`Rendering native MP4 frames ${frame + 1}/${frameCount}`);
+    }
+  };
+
   const cleanupFiles = async (ffmpeg: FFmpeg, names: string[], output: string) => {
     await Promise.all(names.map((name) => ffmpeg.deleteFile(name).catch(() => undefined)));
     await ffmpeg.deleteFile(output).catch(() => undefined);
+  };
+
+  const exportNativeMp4 = async (canvas: HTMLCanvasElement) => {
+    setProgress(1);
+    setExportLabel('Checking native FFmpeg');
+    const availability = await checkNativeFfmpegAvailable();
+    if (!availability.available) {
+      setNativeFfmpegStatus('unavailable');
+      setNativeFfmpegMessage(availability.error ?? 'FFmpeg was not found on the desktop runtime path.');
+      return false;
+    }
+
+    setNativeFfmpegStatus('available');
+    setNativeFfmpegMessage(availability.version ?? 'Native FFmpeg is available.');
+
+    setProgress(2);
+    setExportLabel('Choose MP4 save location');
+    const outputPath = await selectMp4OutputPath(`${filePrefix()}.mp4`);
+    if (!outputPath) {
+      return true;
+    }
+
+    let frameDir: string | null = null;
+    try {
+      setProgress(3);
+      setExportLabel('Preparing native MP4 frames');
+      await waitForFonts();
+      frameDir = await createNativeFrameDirectory(`job-${Date.now()}`);
+      await writeNativeFrames(frameDir, canvas);
+
+      setProgress(75);
+      setExportLabel('Encoding native MP4');
+      const result = await runNativeFfmpegExport({
+        inputFrameDir: frameDir,
+        outputFilePath: outputPath,
+        fps,
+        width: settings.width,
+        height: settings.height,
+        codecSettings: {
+          codec: 'libx264',
+          preset: 'medium',
+          pixelFormat: 'yuv420p',
+          faststart: true
+        }
+      });
+
+      if (!result.success) {
+        throw new Error(result.stderr || `Native FFmpeg failed with exit code ${String(result.exitCode)}`);
+      }
+
+      setProgress(100);
+      setExportLabel('Native MP4 exported');
+      return true;
+    } finally {
+      await cleanupNativeFrameDirectory(frameDir);
+    }
+  };
+
+  const exportNativeSkiaMp4 = async () => {
+    setProgress(1);
+    setExportLabel('Checking native FFmpeg');
+    const availability = await checkNativeFfmpegAvailable();
+    if (!availability.available) {
+      setNativeFfmpegStatus('unavailable');
+      setNativeFfmpegMessage(availability.error ?? 'FFmpeg was not found on the desktop runtime path.');
+      return false;
+    }
+
+    setNativeFfmpegStatus('available');
+    setNativeFfmpegMessage(availability.version ?? 'Native FFmpeg is available.');
+
+    setProgress(3);
+    setExportLabel('Choose MP4 save location');
+    const outputPath = await selectMp4OutputPath(`${filePrefix()}.mp4`);
+    if (!outputPath) {
+      return true;
+    }
+
+    setProgress(8);
+    setExportLabel('Rendering native Skia frames');
+    const jobId = `skia-${Date.now()}`;
+    const cacheRoot = parentPath(outputPath);
+
+    const manifest = await startNativeExport(
+      nativeProject,
+      cacheRoot,
+      jobId,
+      'YouTube Shorts',
+      outputPath
+    );
+
+    if (manifest.state !== 'completed') {
+      throw new Error(manifest.error ?? `Native export ended in ${manifest.state} state.`);
+    }
+
+    setProgress(100);
+    setExportLabel('Native MP4 exported');
+    return true;
+  };
+
+  const exportBackendSceneMp4 = async () => {
+    setProgress(1);
+    setExportLabel('Checking native FFmpeg');
+    const availability = await checkNativeFfmpegAvailable();
+    if (!availability.available) {
+      setNativeFfmpegStatus('unavailable');
+      setNativeFfmpegMessage(availability.error ?? 'FFmpeg was not found on the desktop runtime path.');
+      return false;
+    }
+
+    setNativeFfmpegStatus('available');
+    setNativeFfmpegMessage(availability.version ?? 'Native FFmpeg is available.');
+
+    setProgress(5);
+    setExportLabel('Choose MP4 save location');
+    const outputPath = await selectMp4OutputPath(`${filePrefix()}.mp4`);
+    if (!outputPath) {
+      return true;
+    }
+
+    let cursor = 0;
+    const backendScenes = scenes.map((scene) => {
+      const start = cursor;
+      cursor += Math.max(0.1, scene.duration);
+      return {
+        id: scene.id,
+        text: scene.text,
+        start,
+        duration: Math.max(0.1, scene.duration),
+        accent: scene.accent,
+        offsetX: scene.offsetX,
+        offsetY: scene.offsetY
+      };
+    });
+
+    setProgress(20);
+    setExportLabel(`Backend FFmpeg render ${settings.width}x${settings.height} @ ${settings.fps}fps`);
+    const result = await runBackendSceneExport({
+      outputFilePath: outputPath,
+      width: settings.width,
+      height: settings.height,
+      fps: settings.fps,
+      duration,
+      backgroundColor: background.mode === 'solid' ? background.solidColor : '#090A0D',
+      fontFamily: font.family,
+      fontSize: Math.round(Math.min(settings.width, settings.height) * 0.085 * font.sizeScale),
+      fontColor: font.textColorMode === 'solid' ? font.textColor : '#F4F2EA',
+      scenes: backendScenes
+    });
+
+    if (!result.success) {
+      throw new Error(result.stderr || `Backend FFmpeg failed with exit code ${String(result.exitCode)}`);
+    }
+
+    setProgress(100);
+    setExportLabel('MP4 exported');
+    return true;
   };
 
   const exportVideo = async (kind: ExportKind) => {
@@ -598,6 +992,13 @@ export default function App() {
 
     try {
       if (kind === 'mp4') {
+        if (isDesktopApp()) {
+          const handledByNative = await exportNativeSkiaMp4();
+          if (handledByNative) {
+            return;
+          }
+        }
+
         const blob = await exportMp4(settings, (nextProgress, nextLabel) => {
           setProgress(nextProgress);
           setExportLabel(nextLabel);
@@ -678,22 +1079,60 @@ export default function App() {
     }
   };
 
-  const exportProjectFile = () => {
+  const createProjectFile = (): ProjectFileV1 => ({
+    version: PROJECT_FILE_VERSION,
+    schema: 'scene-premium-v2',
+    createdAt: new Date().toISOString(),
+    scenes: scenes.map(serializeSceneForProject),
+    aspect,
+    fps,
+    safeArea,
+    showGuides,
+    font,
+    brand,
+    background,
+    audio
+  });
+
+  const applyProjectFile = (project: Partial<ProjectFileV1>) => {
+    const nextScenes = project.scenes?.map((scene) => createScene(scene)) ?? [];
+    if (!nextScenes.length) {
+      throw new Error('Unsupported or invalid project file.');
+    }
+
+    setScenes(nextScenes);
+    setActiveSceneId(nextScenes[0].id);
+    setAspect(project.aspect ?? '9:16');
+    setFps(project.fps ?? 30);
+    setSafeArea(project.safeArea ?? 'tiktok');
+    setShowGuides(project.showGuides ?? true);
+    setFont({ ...DEFAULT_FONT, ...(project.font ?? {}) });
+    setBrand({ ...DEFAULT_BRAND, ...(project.brand ?? {}) });
+    setBackground({ ...DEFAULT_BACKGROUND, ...(project.background ?? {}) });
+    setAudio({ ...DEFAULT_AUDIO, ...(project.audio ?? {}) });
+    pausedAtRef.current = 0;
+    setPlayhead(0);
+    pausePreview();
+    setError('');
+  };
+
+  const exportProjectFile = async () => {
     const project: ProjectFileV1 = {
-      version: PROJECT_FILE_VERSION,
-      schema: 'scene-premium-v2',
-      createdAt: new Date().toISOString(),
-      scenes: scenes.map(serializeSceneForProject),
-      aspect,
-      fps,
-      safeArea,
-      showGuides,
-      font,
-      brand,
-      background,
-      audio
+      ...createProjectFile()
     };
-    downloadBlob(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }), `${filePrefix()}-project.json`);
+    const filename = `${filePrefix()}-project.json`;
+    const contents = JSON.stringify(project, null, 2);
+
+    try {
+      if (isDesktopApp()) {
+        await saveProjectJsonToDesktop(filename, contents);
+        return;
+      }
+      downloadBlob(new Blob([contents], { type: 'application/json' }), filename);
+    } catch (cause) {
+      console.error(cause);
+      setError(cause instanceof Error ? cause.message : 'Project export failed.');
+    }
   };
 
   const importProjectFile = async (file: File | null) => {
@@ -702,26 +1141,7 @@ export default function App() {
     }
 
     try {
-      const project = JSON.parse(await file.text()) as Partial<ProjectFileV1>;
-      if ((project.version !== 1 && project.version !== PROJECT_FILE_VERSION) || !Array.isArray(project.scenes) || project.scenes.length === 0) {
-        throw new Error('Unsupported or invalid project file.');
-      }
-
-      const nextScenes = project.scenes.map((scene) => createScene(scene));
-      setScenes(nextScenes);
-      setActiveSceneId(nextScenes[0].id);
-      setAspect(project.aspect ?? '9:16');
-      setFps(project.fps ?? 30);
-      setSafeArea(project.safeArea ?? 'tiktok');
-      setShowGuides(project.showGuides ?? true);
-      setFont({ ...DEFAULT_FONT, ...(project.font ?? {}) });
-      setBrand({ ...DEFAULT_BRAND, ...(project.brand ?? {}) });
-      setBackground({ ...DEFAULT_BACKGROUND, ...(project.background ?? {}) });
-      setAudio({ ...DEFAULT_AUDIO, ...(project.audio ?? {}) });
-      pausedAtRef.current = 0;
-      setPlayhead(0);
-      pausePreview();
-      setError('');
+      applyProjectFile(parseProjectFile(await file.text()));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Project import failed. Current project was not changed.');
     } finally {
@@ -729,6 +1149,27 @@ export default function App() {
         projectInputRef.current.value = '';
       }
     }
+  };
+
+  const importProjectFromDesktop = async () => {
+    try {
+      const projectFile = await openProjectJsonFromDesktop();
+      if (!projectFile) {
+        return;
+      }
+      applyProjectFile(parseProjectFile(projectFile.contents));
+    } catch (cause) {
+      console.error(cause);
+      setError(cause instanceof Error ? cause.message : 'Project import failed. Current project was not changed.');
+    }
+  };
+
+  const requestProjectImport = () => {
+    if (isDesktopApp()) {
+      void importProjectFromDesktop();
+      return;
+    }
+    projectInputRef.current?.click();
   };
 
   const readBackgroundFile = async (file: File | null, mode: 'image' | 'video') => {
@@ -799,11 +1240,11 @@ export default function App() {
             </div>
           </div>
           <div className="topbar-actions">
-            <button className="ghost-button" onClick={exportProjectFile}>
+            <button className="ghost-button" onClick={() => void exportProjectFile()}>
               <Download size={18} />
               Export JSON
             </button>
-            <button className="ghost-button" onClick={() => projectInputRef.current?.click()}>
+            <button className="ghost-button" onClick={requestProjectImport}>
               <FolderOpen size={18} />
               Import JSON
             </button>
@@ -811,6 +1252,12 @@ export default function App() {
               {isPlaying ? <Pause size={18} /> : <Play size={18} />}
               {isPlaying ? 'Pause' : 'Play'}
             </button>
+            {isDesktopApp() && (
+              <button className="ghost-button" disabled={nativeFfmpegStatus === 'checking'} onClick={() => void refreshNativeFfmpegStatus()} title={nativeFfmpegMessage || 'Check native FFmpeg'}>
+                <Shield size={18} />
+                {nativeFfmpegStatus === 'checking' ? 'Checking FFmpeg' : nativeFfmpegStatus === 'available' ? 'FFmpeg Ready' : 'Check FFmpeg'}
+              </button>
+            )}
             <button className="primary-button" disabled={isExporting} onClick={() => exportVideo('mp4')}>
               {isExporting ? <Loader2 className="spin" size={18} /> : <Download size={18} />}
               Download MP4
@@ -858,18 +1305,57 @@ export default function App() {
           <section className="preview-stage">
             <div className="preview-toolbar">
               <div>
-                <p className="eyebrow">Real-time preview</p>
+                <p className="eyebrow">{previewMode === 'native' ? 'Native preview' : 'Browser preview'}</p>
                 <strong>
                   {previewScene.scene.title} · {getAspectSize(aspect).label}
                 </strong>
               </div>
+              {isDesktopApp() && (
+                <div className="segmented segmented-preview-mode">
+                  {(['browser', 'native'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      className={previewMode === mode ? 'active' : ''}
+                      onClick={() => setPreviewMode(mode)}
+                    >
+                      {mode === 'browser' ? 'Browser' : 'Native'}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="time-readout">
                 {playhead.toFixed(2)}s / {duration.toFixed(2)}s
               </div>
             </div>
             <div className={`canvas-frame aspect-${aspect.replace(':', '-')}`}>
-              <canvas ref={previewRef} />
+              {previewMode === 'browser' ? (
+                <canvas ref={previewRef} />
+              ) : (
+                <>
+                  <canvas ref={previewRef} style={{ display: 'none' }} />
+                  {nativePreviewUrl ? (
+                    <img
+                      src={nativePreviewUrl}
+                      alt="Native preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      draggable={false}
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: '#666' }}>
+                      {nativePreviewError || 'Rendering…'}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+            {nativePreviewError && previewMode === 'native' && (
+              <p style={{ color: '#FF6B6B', fontSize: '0.75rem', margin: '0.25rem 0 0' }}>{nativePreviewError}</p>
+            )}
+            {nativeWarnings.length > 0 && previewMode === 'native' && (
+              <div style={{ fontSize: '0.7rem', color: '#FFD60A', marginTop: '0.25rem' }}>
+                {nativeWarnings.map((w, i) => <p key={i} style={{ margin: '0.125rem 0' }}>⚠ {w}</p>)}
+              </div>
+            )}
             <input
               className="timeline"
               type="range"
@@ -1677,11 +2163,11 @@ export default function App() {
               onChange={(event) => void importProjectFile(event.target.files?.[0] ?? null)}
             />
             <div className="project-actions">
-              <button className="ghost-button" onClick={exportProjectFile}>
+              <button className="ghost-button" onClick={() => void exportProjectFile()}>
                 <Download size={18} />
                 Export JSON
               </button>
-              <button className="ghost-button" onClick={() => projectInputRef.current?.click()}>
+              <button className="ghost-button" onClick={requestProjectImport}>
                 <FolderOpen size={18} />
                 Import JSON
               </button>
@@ -1713,6 +2199,17 @@ export default function App() {
               <Download size={18} />
               Download MP4
             </button>
+            {isDesktopApp() && (
+              <>
+                <button className="ghost-button full" disabled={isExporting || nativeFfmpegStatus === 'checking'} onClick={() => void refreshNativeFfmpegStatus()}>
+                  <Shield size={18} />
+                  {nativeFfmpegStatus === 'checking' ? 'Checking Native FFmpeg' : 'Check Native FFmpeg'}
+                </button>
+                <p className="format-note">
+                  Native FFmpeg: {nativeFfmpegStatus === 'available' ? nativeFfmpegMessage : nativeFfmpegStatus === 'unavailable' ? nativeFfmpegMessage || 'Unavailable' : 'Not checked'}
+                </p>
+              </>
+            )}
             <p className="format-note">
               MP4 and Alpha WebM use WebCodecs for long exports. Alpha MOV is ProRes 4444 and heavier for long timelines.
             </p>

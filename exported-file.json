@@ -1,0 +1,333 @@
+{
+  "version": 2,
+  "schema": "scene-premium-v2",
+  "createdAt": "2026-05-15T18:01:04.266Z",
+  "scenes": [
+    {
+      "id": "scene-hook",
+      "title": "Hook",
+      "text": "Most videos lose attention before the point lands.",
+      "animationStyle": "stomp",
+      "accent": "#FF3B30",
+      "duration": 4.2,
+      "activeWordCount": 2,
+      "wordColors": {
+        "3": "#FF3B30"
+      },
+      "offsetX": 0,
+      "offsetY": 0,
+      "intent": "hook",
+      "visualIntensity": 0.9,
+      "broll": {
+        "enabled": true,
+        "query": "person scrolling phone social media",
+        "purpose": "Show the viewer behavior being discussed.",
+        "selectedAssetId": "hook-pexels",
+        "fallbackMode": "try-next-provider",
+        "assets": [
+          {
+            "id": "hook-pexels",
+            "rank": 1,
+            "source": "Pexels",
+            "title": "Person Using Smartphone",
+            "imageUrl": "https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg",
+            "pageUrl": "https://www.pexels.com/photo/person-holding-smartphone-607812/",
+            "license": "Pexels License",
+            "creator": "freestocks.org",
+            "relevanceScore": 0.92
+          },
+          {
+            "id": "hook-unsplash",
+            "rank": 2,
+            "source": "Unsplash",
+            "title": "Phone in Hand",
+            "imageUrl": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3",
+            "pageUrl": "https://unsplash.com/photos/person-holding-smartphone",
+            "license": "Unsplash License",
+            "creator": "Unsplash Contributor",
+            "relevanceScore": 0.84
+          },
+          {
+            "id": "hook-pixabay",
+            "rank": 3,
+            "source": "Pixabay",
+            "title": "Mobile Phone",
+            "imageUrl": "https://cdn.pixabay.com/photo/2016/11/29/12/30/phone-1869510_1280.jpg",
+            "pageUrl": "https://pixabay.com/photos/phone-mobile-smartphone-1869510/",
+            "license": "Pixabay Content License",
+            "creator": "Pixabay",
+            "relevanceScore": 0.78
+          }
+        ],
+        "fit": "cover",
+        "opacity": 1,
+        "darken": 0.42,
+        "blur": 0,
+        "vignette": 0.32
+      },
+      "camera": {
+        "enabled": true,
+        "zoomFrom": 1,
+        "zoomTo": 1.16,
+        "panXFrom": 0,
+        "panXTo": -0.04,
+        "panYFrom": 0,
+        "panYTo": 0.02,
+        "easing": "easeOutCubic"
+      },
+      "transitionIn": {
+        "type": "flash",
+        "duration": 0.18,
+        "direction": "left"
+      },
+      "transitionOut": {
+        "type": "zoom",
+        "duration": 0.22,
+        "direction": "left"
+      },
+      "graphics": [
+        {
+          "id": "hook-warning",
+          "type": "warning-label",
+          "start": 0.25,
+          "end": 2.4,
+          "x": 0.5,
+          "y": 0.22,
+          "text": "RETENTION DROP",
+          "value": "",
+          "color": "#FF3B30",
+          "animation": "pop"
+        }
+      ]
+    },
+    {
+      "id": "scene-proof",
+      "title": "Proof",
+      "text": "Premium edits reset the screen before the viewer gets bored.",
+      "animationStyle": "caption-stack",
+      "accent": "#FFD60A",
+      "duration": 5,
+      "activeWordCount": 3,
+      "wordColors": {
+        "1": "#FFD60A",
+        "5": "#64D2FF"
+      },
+      "offsetX": 0,
+      "offsetY": 0,
+      "intent": "proof",
+      "visualIntensity": 0.7,
+      "broll": {
+        "enabled": true,
+        "query": "video editing timeline computer screen",
+        "purpose": "Represent premium editing and visual pacing.",
+        "selectedAssetId": "proof-pexels",
+        "fallbackMode": "try-next-provider",
+        "assets": [
+          {
+            "id": "proof-pexels",
+            "rank": 1,
+            "source": "Pexels",
+            "title": "Video Editing",
+            "imageUrl": "https://images.pexels.com/photos/2510428/pexels-photo-2510428.jpeg",
+            "pageUrl": "https://www.pexels.com/photo/person-using-macbook-pro-2510428/",
+            "license": "Pexels License",
+            "creator": "Pexels Contributor",
+            "relevanceScore": 0.88
+          },
+          {
+            "id": "proof-unsplash",
+            "rank": 2,
+            "source": "Unsplash",
+            "title": "Editing Desk",
+            "imageUrl": "https://images.unsplash.com/photo-1497366754035-f200968a6e72",
+            "pageUrl": "https://unsplash.com/photos/workspace",
+            "license": "Unsplash License",
+            "creator": "Unsplash Contributor",
+            "relevanceScore": 0.74
+          },
+          {
+            "id": "proof-pixabay",
+            "rank": 3,
+            "source": "Pixabay",
+            "title": "Computer Workstation",
+            "imageUrl": "https://cdn.pixabay.com/photo/2015/01/08/18/25/startup-593327_1280.jpg",
+            "pageUrl": "https://pixabay.com/photos/startup-start-up-people-593327/",
+            "license": "Pixabay Content License",
+            "creator": "Pixabay",
+            "relevanceScore": 0.72
+          }
+        ],
+        "fit": "cover",
+        "opacity": 1,
+        "darken": 0.36,
+        "blur": 2,
+        "vignette": 0.26
+      },
+      "camera": {
+        "enabled": true,
+        "zoomFrom": 1.04,
+        "zoomTo": 1.13,
+        "panXFrom": 0.02,
+        "panXTo": -0.02,
+        "panYFrom": 0,
+        "panYTo": -0.01,
+        "easing": "easeInOut"
+      },
+      "transitionIn": {
+        "type": "fade",
+        "duration": 0.25,
+        "direction": "left"
+      },
+      "transitionOut": {
+        "type": "blur",
+        "duration": 0.22,
+        "direction": "left"
+      },
+      "graphics": [
+        {
+          "id": "proof-stat",
+          "type": "stat-card",
+          "start": 1.1,
+          "end": 3.8,
+          "x": 0.5,
+          "y": 0.76,
+          "text": "SCREEN RESET",
+          "value": "3-7s",
+          "color": "#FFD60A",
+          "animation": "slide"
+        },
+        {
+          "id": "proof-underline",
+          "type": "underline",
+          "start": 2.6,
+          "end": 4.2,
+          "x": 0.5,
+          "y": 0.58,
+          "text": "",
+          "value": "",
+          "color": "#64D2FF",
+          "animation": "draw"
+        }
+      ]
+    },
+    {
+      "id": "scene-cta",
+      "title": "CTA",
+      "text": "Use scenes, B-roll, and motion to make every second earn attention.",
+      "animationStyle": "word-zoom",
+      "accent": "#32D74B",
+      "duration": 4.8,
+      "activeWordCount": 2,
+      "wordColors": {
+        "2": "#32D74B",
+        "5": "#FFD60A"
+      },
+      "offsetX": 0,
+      "offsetY": 0,
+      "intent": "cta",
+      "visualIntensity": 0.6,
+      "broll": {
+        "enabled": false,
+        "query": "",
+        "purpose": "",
+        "selectedAssetId": "",
+        "fallbackMode": "try-next-provider",
+        "assets": [],
+        "fit": "cover",
+        "opacity": 1,
+        "darken": 0.25,
+        "blur": 0,
+        "vignette": 0.2
+      },
+      "camera": {
+        "enabled": true,
+        "zoomFrom": 1,
+        "zoomTo": 1.08,
+        "panXFrom": 0,
+        "panXTo": 0,
+        "panYFrom": 0,
+        "panYTo": 0,
+        "easing": "easeOutCubic"
+      },
+      "transitionIn": {
+        "type": "slide",
+        "duration": 0.24,
+        "direction": "up"
+      },
+      "transitionOut": {
+        "type": "fade",
+        "duration": 0.25,
+        "direction": "left"
+      },
+      "graphics": [
+        {
+          "id": "cta-arrow",
+          "type": "arrow",
+          "start": 1.2,
+          "end": 3.6,
+          "x": 0.5,
+          "y": 0.74,
+          "text": "",
+          "value": "",
+          "color": "#32D74B",
+          "animation": "pop"
+        }
+      ]
+    }
+  ],
+  "aspect": "9:16",
+  "fps": 30,
+  "safeArea": "tiktok",
+  "showGuides": false,
+  "font": {
+    "family": "Bebas Neue, Impact, sans-serif",
+    "weight": 900,
+    "sizeScale": 1,
+    "uppercase": true,
+    "letterSpacing": 0,
+    "lineHeight": 1.08,
+    "strokeWidth": 0.06,
+    "shadowBlur": 24,
+    "highlightShape": "pill",
+    "maxWordsPerLine": 4,
+    "position": "center",
+    "textAlign": "center",
+    "textColorMode": "solid",
+    "textColor": "#F4F2EA",
+    "gradientFrom": "#FFFFFF",
+    "gradientMid": "#FFD60A",
+    "gradientTo": "#FFD60A",
+    "gradientDirection": 0
+  },
+  "brand": {
+    "colors": [
+      "#FF3B30",
+      "#FFD60A",
+      "#32D74B",
+      "#64D2FF",
+      "#BF5AF2",
+      "#FF9F0A"
+    ],
+    "fontFamily": "Inter, Arial, sans-serif",
+    "watermark": "Kinetic Text",
+    "watermarkEnabled": false
+  },
+  "background": {
+    "mode": "transparent",
+    "solidColor": "#111318",
+    "gradientFrom": "#111318",
+    "gradientTo": "#29313f",
+    "gradientDirection": 135,
+    "mediaDataUrl": "",
+    "mediaName": "",
+    "mediaFit": "cover",
+    "includeInExport": false
+  },
+  "audio": {
+    "enabled": false,
+    "preset": "pulse-bass",
+    "volume": 0.55,
+    "intensity": 0.65,
+    "autoSelect": true
+  }
+}

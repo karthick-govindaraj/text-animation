@@ -1,15 +1,15 @@
 {
-  "_readme": "Kinetic Text Studio — Scene Premium JSON v2. Paste this schema to an AI with your content brief. The AI should return an importable project JSON using the same top-level shape, excluding _readme, _schema, and _ai_instructions.",
+  "_readme": "Kinetic Text Studio — Scene Production JSON v3. Paste this schema to an AI with your content brief. The AI should return an importable project JSON using the same top-level shape, excluding _readme, _schema, and _ai_instructions.",
   "_schema": {
     "version": {
       "type": "number",
       "required": true,
-      "value": 2
+      "value": 3
     },
     "schema": {
       "type": "string",
       "required": true,
-      "value": "scene-premium-v2"
+      "value": "scene-production-v3"
     },
     "scenes": {
       "type": "array",

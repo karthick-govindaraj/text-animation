@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -34,6 +36,11 @@
     "@fontsource/sora": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
     "@fontsource/teko": "^5.2.7",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "howler": "^2.2.4",
     "lucide-react": "^0.468.0",
     "mp4-muxer": "^5.2.2",
@@ -42,6 +49,7 @@
     "webm-muxer": "^5.1.4"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.1",
     "@types/howler": "^2.2.12",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
